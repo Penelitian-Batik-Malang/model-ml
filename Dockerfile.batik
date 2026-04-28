@@ -1,0 +1,27 @@
+FROM python:3.9-slim
+
+# Install system dependencies for OpenCV and other tools
+RUN apt-get update && apt-get install -y \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    libgl1 \
+    build-essential \
+    python3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Upgrade pip and install wheel
+RUN pip install --upgrade pip setuptools wheel
+
+COPY requirements-batik.txt .
+# Install torch separately if needed, or rely on requirements
+RUN pip install -r requirements-batik.txt
+
+# Pre-download ConvNeXt Small weights during build so they're cached in the image.
+# This prevents a ~192MB download on every container start.
+RUN python -c "from torchvision import models; models.convnext_small(weights=models.ConvNeXt_Small_Weights.DEFAULT)"
+
+EXPOSE 8001

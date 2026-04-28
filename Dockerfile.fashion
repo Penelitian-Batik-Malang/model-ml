@@ -1,0 +1,25 @@
+FROM python:3.7-slim
+
+# Install system dependencies for OpenCV and pycocotools
+RUN apt-get update && apt-get install -y \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    libgl1 \
+    build-essential \
+    python3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Upgrade pip and install wheel
+RUN pip install --upgrade pip setuptools wheel
+
+COPY requirements-fashion.txt .
+RUN pip install -r requirements-fashion.txt
+
+# Set PYTHONPATH to include the tpu folder so official.detection works
+ENV PYTHONPATH="${PYTHONPATH}:/app/tpu/models"
+
+EXPOSE 8000

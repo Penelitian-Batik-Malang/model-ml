@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env
+
+# Models and Checkpoints (Large Files)
+models/*
+!models/README.md
+checkpoints/*
+!checkpoints/README.md
+
+# Application Data
+sessions/*
+data/*
+!data/README.md
+
+# Docker
+.docker/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
