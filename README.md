@@ -1,7 +1,7 @@
 # ML API — Dokumentasi Final
 > Versi final setelah migrasi ke arsitektur microservice Docker.
 > Dokumen ini adalah referensi utama untuk integrasi Laravel dan pengembangan selanjutnya.
-
+> Link file yang dibutuhkan (MODELS, DATA, CHECKPOINTS) : https://drive.google.com/drive/folders/1-BeWhnrE5rsIWSqC3D1UuWjFy4COIupF?usp=drive_link
 ---
 
 ## Arsitektur Keseluruhan
