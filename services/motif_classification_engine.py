@@ -19,10 +19,10 @@ try:
 except Exception:
     pass
 
-from config import BASE_DIR
+from config import BATIK_MOTIF_LABEL_JSON, BATIK_MOTIF_MODEL_H5
 
-DEFAULT_MODEL_PATH = str(BASE_DIR / "models" / "augmentTest_batik_cnn_pararel_elu3.h5")
-DEFAULT_LABEL_PATH = str(BASE_DIR / "models" / "label_mapping_pararelEluAugment3.json")
+DEFAULT_MODEL_PATH = str(BATIK_MOTIF_MODEL_H5)
+DEFAULT_LABEL_PATH = str(BATIK_MOTIF_LABEL_JSON)
 
 model = None
 label_map = {}

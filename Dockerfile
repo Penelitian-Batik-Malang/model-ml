@@ -1,6 +1,10 @@
-FROM python:3.7-slim
+FROM python:3.11-slim
 
-# Install system dependencies untuk OpenCV, pycocotools, dan OpenGL
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app:/app/tpu/models:/app/tpu/models/official/efficientnet:/app/tpu/models/hyperparameters
+
+# Install system dependencies untuk OpenCV dan OpenGL
 RUN apt-get update && apt-get install -y \
     libglib2.0-0 \
     libsm6 \
@@ -13,16 +17,16 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-RUN pip install --upgrade pip setuptools wheel
+RUN mkdir -p /app/models /app/checkpoints /app/data
 
-# requirements.txt dari pip freeze — simpan sebagai UTF-8 sebelum build
+RUN pip install --upgrade pip setuptools wheel
+RUN pip install gunicorn
+
 COPY requirements.txt .
 RUN pip install -r requirements.txt
 
-# Pre-download ConvNeXt Small weights agar tidak diunduh saat container start
-RUN python -c "from torchvision import models; models.convnext_small(weights=models.ConvNeXt_Small_Weights.DEFAULT)"
-
-# PYTHONPATH untuk fashion inference script (tpu/models)
-ENV PYTHONPATH="/app/tpu/models:/app/tpu/models/official/efficientnet:/app/tpu/models/hyperparameters"
+COPY . .
 
 EXPOSE 8000
+
+CMD ["gunicorn", "-k", "uvicorn.workers.UvicornWorker", "-w", "2", "-b", "0.0.0.0:8000", "main:app"]

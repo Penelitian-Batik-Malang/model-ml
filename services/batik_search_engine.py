@@ -27,6 +27,7 @@ features = np.array([])
 kmeans = None
 cluster_df = pd.DataFrame()
 feature_extractor = None
+FEATURE_EXTRACTOR_WEIGHTS = os.getenv("BATIK_SEARCH_FEATURE_EXTRACTOR_WEIGHTS", "").strip()
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 IMG_SIZE = 224
@@ -55,10 +56,17 @@ def load_cbir_models():
         if os.path.exists(DEFAULT_INDEXED_DB_PATH):
             cluster_df = pd.read_csv(DEFAULT_INDEXED_DB_PATH)
         else:
-            print(f"[Batik Search] Indexed database not found")
+            print("[Batik Search] Indexed database not found")
             
-        feature_extractor = models.convnext_small(weights=models.ConvNeXt_Small_Weights.DEFAULT)
+        feature_extractor = models.convnext_small(weights=None)
         feature_extractor.classifier[-1] = torch.nn.Identity()
+
+        if FEATURE_EXTRACTOR_WEIGHTS and os.path.exists(FEATURE_EXTRACTOR_WEIGHTS):
+            checkpoint = torch.load(FEATURE_EXTRACTOR_WEIGHTS, map_location=DEVICE)
+            if isinstance(checkpoint, dict) and "state_dict" in checkpoint:
+                checkpoint = checkpoint["state_dict"]
+            feature_extractor.load_state_dict(checkpoint)
+
         feature_extractor = feature_extractor.to(DEVICE).eval()
         
         print("[Batik Search] Models loaded successfully")
