@@ -1,56 +1,88 @@
 # Batik & Fashion ML API
 
-This repository contains the Machine Learning services for Batik Classification, Fashion Segmentation, and Batik Recommendations.
+Machine Learning service terpadu untuk Klasifikasi Batik, Segmentasi Fashion, dan Rekomendasi Batik — dijalankan sebagai **satu service** berbasis Python 3.7 / TF 1.15 / PyTorch 1.12.
 
-## 🚀 Quick Start
+## Prerequisites
 
-### 1. Prerequisites
-- Python 3.9+
-- Docker & Docker Compose (Recommended)
-- Large Model Files (see `models/README.md` and `checkpoints/README.md`)
+- Python 3.7
+- Docker & Docker Compose (opsional)
+- File model besar — lihat `models/README.md` dan `checkpoints/README.md`
 
-### 2. Installation (Local)
+---
+
+## Instalasi Lokal (Virtual Environment)
+
 ```bash
-# Clone the repository
-git clone https://github.com/Penelitian-Batik-Malang/model-ml.git
-cd model-ml
+# Buat dan aktifkan venv Python 3.7
+py -3.7 -m venv venv
+venv\Scripts\activate          # Windows
+# source venv/bin/activate     # Linux/Mac
 
-# Install dependencies (choose service)
-pip install -r requirements-batik.txt
-# OR
-pip install -r requirements-fashion.txt
+# Install dependencies
+pip install -r requirements.txt
+
+# Jalankan server
+uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-### 3. Running with Docker
+> **Catatan**: `requirements.txt` adalah hasil `pip freeze`. Pastikan file disimpan sebagai **UTF-8** sebelum digunakan untuk Docker build.
+
+---
+
+## Menjalankan dengan Docker
+
 ```bash
 docker-compose up --build
 ```
 
----
-
-## 📦 Large Files Management (Models & Checkpoints)
-
-Due to their size, models and checkpoints are **not included** in this repository. 
-
-### Where to store them?
-- **Development**: Keep them in the `models/`, `checkpoints/`, and `data/` folders as specified in `config.py`.
-- **VPS/Production**: 
-    1. Store the files in a secure Cloud Storage (e.g., S3, Google Drive, or a dedicated storage server).
-    2. On the VPS, create these directories manually in the project root.
-    3. Use `wget` or `curl` to download them directly to the VPS.
-    4. **Docker Tip**: Always mount these directories as **Volumes** so you don't have to include 1GB+ files in your Docker images.
-
-See [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md) for detailed VPS instructions.
+Service tersedia di `http://localhost:8000`.
 
 ---
 
-## 🛠 Services
-- **Batik Service (Port 8001)**: Search, Motif Classification, Type Classification.
-- **Fashion Service (Port 8002)**: Segmentation, Blending, Recommendation.
+## Endpoints
+
+| Prefix | Fungsi |
+|--------|--------|
+| `POST /fashion/segment` | Segmentasi pakaian (Mask R-CNN, Fashionpedia) |
+| `POST /fashion/blend-manual` | Blending batik ke pakaian (upload manual) |
+| `POST /fashion/blend-cbir` | Blending batik ke pakaian (rekomendasi warna) |
+| `POST /search/general` | Pencarian batik serupa (CBIR ConvNeXt Small) |
+| `POST /detection/motif` | Klasifikasi motif batik (CNN parallel) |
+| `POST /detection/type` | Klasifikasi jenis batik — Tulis vs Cap (ConvNeXt Tiny) |
+| `GET  /health` | Health check |
+| `GET  /docs` | Swagger UI (auto-generated) |
 
 ---
 
-## 📄 Documentation
-- [Models Requirements](./models/README.md)
-- [Checkpoints Requirements](./checkpoints/README.md)
-- [Deployment Guide](./DEPLOYMENT_GUIDE.md)
+## Manajemen File Besar (Model & Checkpoint)
+
+Model dan checkpoint **tidak disertakan** di repository karena ukurannya.
+
+**Struktur direktori yang dibutuhkan:**
+```
+ml-api/
+├── models/          # .h5, .pt, .npy, .pkl, .csv, .json
+├── checkpoints/     # fashionpedia-r50-fpn/model.ckpt.*
+└── data/            # batik_skenario_3_warna.npz
+```
+
+**Development**: Letakkan file di folder masing-masing sesuai `config.py`.
+
+**VPS/Production**:
+1. Simpan di cloud storage (S3, Google Drive, dsb.)
+2. Download langsung ke VPS dengan `wget` atau `curl`
+3. Mount folder sebagai Docker Volume agar tidak masuk ke image
+
+Lihat [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md) untuk panduan VPS lengkap.
+
+---
+
+## Stack Teknis
+
+| Komponen | Versi |
+|----------|-------|
+| Python | 3.7 |
+| TensorFlow | 1.15.0 (fashion inference + motif CNN) |
+| PyTorch | 1.12.1 + torchvision 0.13.1 (batik search & type) |
+| FastAPI | 0.68.x |
+| Port | 8000 (single service) |

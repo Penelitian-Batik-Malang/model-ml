@@ -43,5 +43,4 @@ BATIK_TYPE_MODEL_PT = BASE_DIR / "models" / "model_ConvNextTiny_original_all.pt"
 # ==========================================
 # 6. SERVER CONFIGURATION
 # ==========================================
-FASHION_SERVICE_PORT = int(os.getenv("PORT", 8002))
-BATIK_SERVICE_PORT = int(os.getenv("PORT", 8001))
+SERVICE_PORT = int(os.getenv("PORT", 8000))

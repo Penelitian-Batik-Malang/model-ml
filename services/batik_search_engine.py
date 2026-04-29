@@ -1,5 +1,15 @@
 import os
+import sys
 import numpy as np
+import numpy.core as _np_core
+
+# Shim: KMeans pkl disimpan dengan numpy>=1.25 yang punya numpy._core,
+# tapi numpy<1.25 hanya punya numpy.core. Map supaya pickle bisa resolve.
+sys.modules.setdefault("numpy._core", _np_core)
+sys.modules.setdefault("numpy._core.multiarray", _np_core.multiarray)
+sys.modules.setdefault("numpy._core.numeric", _np_core.numeric)
+sys.modules.setdefault("numpy._core.umath", _np_core.umath)
+
 import pandas as pd
 from PIL import Image
 from sklearn.metrics.pairwise import cosine_similarity
