@@ -4,7 +4,6 @@ import sys
 from pathlib import Path
 from typing import Dict, Optional, Tuple
 
-import cv2
 import numpy as np
 from pycocotools import mask as mask_api
 

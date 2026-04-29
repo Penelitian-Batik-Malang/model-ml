@@ -1,11 +1,6 @@
-import base64
-import io
-import os
 from pathlib import Path
 
-import cv2
 import numpy as np
-from PIL import Image
 from scipy.optimize import linear_sum_assignment
 from sklearn.cluster import KMeans
 
