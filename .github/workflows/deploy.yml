@@ -89,17 +89,17 @@ jobs:
           echo "FASTAPI_IMAGE=${{ env.REGISTRY }}/${IMAGE_NAME_LOWER}:${{ github.sha }}" >> $GITHUB_ENV
 
       - name: Prepare deployment env file
+        env:
+          FASTAPI_IMAGE_VAL: ${{ env.FASTAPI_IMAGE }}
         run: |
           if [ -n "${{ secrets.ENV_PROD }}" ]; then
             printf '%s' "${{ secrets.ENV_PROD }}" > .env
           else
-            cat > .env <<EOF
-FASTAPI_IMAGE=${{ env.FASTAPI_IMAGE }}
-BATIK_MODELS_DIR=/opt/models
-BATIK_CHECKPOINTS_DIR=/opt/checkpoints
-BATIK_DATA_DIR=/opt/data
-PORT=8000
-EOF
+            echo "FASTAPI_IMAGE=${FASTAPI_IMAGE_VAL}" > .env
+            echo "BATIK_MODELS_DIR=/opt/models" >> .env
+            echo "BATIK_CHECKPOINTS_DIR=/opt/checkpoints" >> .env
+            echo "BATIK_DATA_DIR=/opt/data" >> .env
+            echo "PORT=8000" >> .env
           fi
 
       - name: Copy deployment files to VPS
