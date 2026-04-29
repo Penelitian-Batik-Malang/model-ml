@@ -9,14 +9,14 @@ import joblib
 import torch
 from torchvision import models, transforms
 
+from config import BATIK_SEARCH_FEATURES_NPY, BATIK_SEARCH_KMEANS_MODEL, BATIK_SEARCH_INDEXED_DB_CSV
+
 # Shim: KMeans pkl disimpan dengan numpy>=1.25 yang punya numpy._core,
 # tapi numpy<1.25 hanya punya numpy.core. Map supaya pickle bisa resolve.
 sys.modules.setdefault("numpy._core", _np_core)
 sys.modules.setdefault("numpy._core.multiarray", _np_core.multiarray)
 sys.modules.setdefault("numpy._core.numeric", _np_core.numeric)
 sys.modules.setdefault("numpy._core.umath", _np_core.umath)
-
-from config import BATIK_SEARCH_FEATURES_NPY, BATIK_SEARCH_KMEANS_MODEL, BATIK_SEARCH_INDEXED_DB_CSV
 
 DEFAULT_FEATURES_PATH = str(BATIK_SEARCH_FEATURES_NPY)
 DEFAULT_KMEANS_PATH = str(BATIK_SEARCH_KMEANS_MODEL)
