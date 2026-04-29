@@ -1,5 +1,15 @@
 import os
+import sys
 import numpy as np
+import numpy.core as _np_core
+
+# Shim: KMeans pkl disimpan dengan numpy>=1.25 yang punya numpy._core,
+# tapi numpy<1.25 hanya punya numpy.core. Map supaya pickle bisa resolve.
+sys.modules.setdefault("numpy._core", _np_core)
+sys.modules.setdefault("numpy._core.multiarray", _np_core.multiarray)
+sys.modules.setdefault("numpy._core.numeric", _np_core.numeric)
+sys.modules.setdefault("numpy._core.umath", _np_core.umath)
+
 import pandas as pd
 from PIL import Image
 from sklearn.metrics.pairwise import cosine_similarity
@@ -17,6 +27,7 @@ features = np.array([])
 kmeans = None
 cluster_df = pd.DataFrame()
 feature_extractor = None
+FEATURE_EXTRACTOR_WEIGHTS = os.getenv("BATIK_SEARCH_FEATURE_EXTRACTOR_WEIGHTS", "").strip()
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 IMG_SIZE = 224
@@ -45,10 +56,17 @@ def load_cbir_models():
         if os.path.exists(DEFAULT_INDEXED_DB_PATH):
             cluster_df = pd.read_csv(DEFAULT_INDEXED_DB_PATH)
         else:
-            print(f"[Batik Search] Indexed database not found")
+            print("[Batik Search] Indexed database not found")
             
-        feature_extractor = models.convnext_small(weights=models.ConvNeXt_Small_Weights.DEFAULT)
+        feature_extractor = models.convnext_small(weights=None)
         feature_extractor.classifier[-1] = torch.nn.Identity()
+
+        if FEATURE_EXTRACTOR_WEIGHTS and os.path.exists(FEATURE_EXTRACTOR_WEIGHTS):
+            checkpoint = torch.load(FEATURE_EXTRACTOR_WEIGHTS, map_location=DEVICE)
+            if isinstance(checkpoint, dict) and "state_dict" in checkpoint:
+                checkpoint = checkpoint["state_dict"]
+            feature_extractor.load_state_dict(checkpoint)
+
         feature_extractor = feature_extractor.to(DEVICE).eval()
         
         print("[Batik Search] Models loaded successfully")
