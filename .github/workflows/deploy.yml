@@ -59,39 +59,42 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push image
-        - name: Normalize IMAGE_NAME to lowercase
-          run: |
-            echo "IMAGE_NAME=$(echo '${{ env.IMAGE_NAME }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+      - name: Normalize IMAGE_NAME to lowercase
+        run: |
+          IMAGE_NAME_LOWER=$(echo '${{ env.IMAGE_NAME }}' | tr '[:upper:]' '[:lower:]')
+          echo "IMAGE_NAME_LOWER=${IMAGE_NAME_LOWER}" >> $GITHUB_ENV
 
-        - name: Build and push image
-          uses: docker/build-push-action@v6
-          with:
-            context: .
-            push: true
-            tags: |
-              ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
-              ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:latest
 
   deploy:
     if: github.event_name == 'push'
     needs: build
     runs-on: ubuntu-latest
     env:
-      DEPLOY_PATH: /opt/batik/fastapi
-      FASTAPI_IMAGE: ghcr.io/${{ env.IMAGE_NAME }}:${{ github.sha }}
+      DEPLOY_PATH: /opt/app/fastapi
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Normalize IMAGE_NAME for deploy
+        run: |
+          IMAGE_NAME_LOWER=$(echo '${{ env.IMAGE_NAME }}' | tr '[:upper:]' '[:lower:]')
+          echo "FASTAPI_IMAGE=${{ env.REGISTRY }}/${IMAGE_NAME_LOWER}:${{ github.sha }}" >> $GITHUB_ENV
+
       - name: Prepare deployment env file
         run: |
-          # If ENV_PROD secret present, write it verbatim; otherwise create minimal .env
           if [ -n "${{ secrets.ENV_PROD }}" ]; then
             printf '%s' "${{ secrets.ENV_PROD }}" > .env
           else
             cat > .env <<EOF
-FASTAPI_IMAGE=${FASTAPI_IMAGE}
+FASTAPI_IMAGE=${{ env.FASTAPI_IMAGE }}
 BATIK_MODELS_DIR=/opt/models
 BATIK_CHECKPOINTS_DIR=/opt/checkpoints
 BATIK_DATA_DIR=/opt/data
@@ -109,7 +112,7 @@ EOF
           source: "docker-compose.yml,.env"
           target: ${{ env.DEPLOY_PATH }}
 
-      - name: Pull and restart service on VPS
+      - name: Deploy on VPS
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -120,7 +123,20 @@ EOF
           script: |
             set -e
             cd ${{ env.DEPLOY_PATH }}
+            
+            # Ensure network exists
             docker network inspect batik_network >/dev/null 2>&1 || docker network create batik_network
+            
+            # Pull and deploy
             docker compose pull fastapi
             docker compose up -d --no-build --remove-orphans
-            curl --fail --retry 10 --retry-delay 5 http://127.0.0.1:8000/health
+            
+            # Health check with retry
+            sleep 5
+            curl --fail --retry 10 --retry-delay 3 http://127.0.0.1:8000/health || {
+              echo "Health check failed"
+              docker compose logs fastapi
+              exit 1
+            }
+            
+            echo "✅ Deployment successful"
