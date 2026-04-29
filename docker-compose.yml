@@ -1,30 +1,18 @@
-version: '3.8'
-
 services:
-  fashion-service:
+  fastapi:
+    image: ${FASTAPI_IMAGE:-batik-fastapi:local}
     build:
       context: .
-      dockerfile: Dockerfile.fashion
+      dockerfile: Dockerfile
+    network_mode: "host"
     ports:
-      - "8002:8002"
+      - "127.0.0.1:8000:8000"
     volumes:
-      - .:/app
+      - ${BATIK_MODELS_DIR:-/opt/models}:/app/models:ro
+      - ${BATIK_CHECKPOINTS_DIR:-/opt/checkpoints}:/app/checkpoints:ro
+      - ${BATIK_DATA_DIR:-/opt/data}:/app/data:ro
     environment:
-      - PORT=8002
-    command: uvicorn main_fashion:app --host 0.0.0.0 --port 8002 --reload
-
-  batik-service:
-    build:
-      context: .
-      dockerfile: Dockerfile.batik
-    ports:
-      - "8001:8001"
-    volumes:
-      - .:/app
-      - torch_cache:/root/.cache/torch
-    environment:
-      - PORT=8001
-    command: uvicorn main_batik:app --host 0.0.0.0 --port 8001 --reload
-
-volumes:
-  torch_cache:
+      PORT: 8000
+      BATIK_MODELS_DIR: ${BATIK_MODELS_DIR:-/opt/models}
+      BATIK_CHECKPOINTS_DIR: ${BATIK_CHECKPOINTS_DIR:-/opt/checkpoints}
+      BATIK_DATA_DIR: ${BATIK_DATA_DIR:-/opt/data}
