@@ -110,6 +110,7 @@ jobs:
           port: ${{ secrets.VPS_SSH_PORT }}
           key: ${{ secrets.VPS_SSH_KEY }}
           passphrase: ${{ secrets.VPS_SSH_PASSPHRASE }}
+          overwrite: true
           source: "docker-compose.yml,.env"
           target: ${{ env.DEPLOY_PATH }}
 
