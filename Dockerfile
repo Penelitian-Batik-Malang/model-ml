@@ -23,7 +23,7 @@ RUN pip install --upgrade pip setuptools wheel
 RUN pip install gunicorn
 
 COPY requirements.txt .
-RUN pip install -r requirements.txt
+RUN pip install --no-cache-dir --only-binary=:all: -r requirements.txt
 
 COPY . .
 
