@@ -10,7 +10,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository || 'batik-fastapi' }}
+  IMAGE_NAME: ${{ vars.IMAGE_NAME || 'penelitian-batik-malang/batik-fastapi' }}
 
 jobs:
   test:
@@ -48,9 +48,14 @@ jobs:
     permissions:
       contents: read
       packages: write
+    outputs:
+      image_tag: ${{ github.sha }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
       - name: Log in to GHCR
         uses: docker/login-action@v3
@@ -61,7 +66,7 @@ jobs:
 
       - name: Normalize IMAGE_NAME to lowercase
         run: |
-          IMAGE_NAME_LOWER=$(echo '${{ env.IMAGE_NAME }}' | tr '[:upper:]' '[:lower:]')
+          IMAGE_NAME_LOWER=$(echo "${{ env.IMAGE_NAME }}" | tr '[:upper:]' '[:lower:]')
           echo "IMAGE_NAME_LOWER=${IMAGE_NAME_LOWER}" >> $GITHUB_ENV
 
       - name: Build and push Docker image
@@ -72,34 +77,44 @@ jobs:
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:${{ github.sha }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
   deploy:
     if: github.event_name == 'push'
     needs: build
     runs-on: ubuntu-latest
+    environment: production
     env:
       DEPLOY_PATH: /opt/app/fastapi
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Normalize IMAGE_NAME for deploy
         run: |
-          IMAGE_NAME_LOWER=$(echo '${{ env.IMAGE_NAME }}' | tr '[:upper:]' '[:lower:]')
-          echo "FASTAPI_IMAGE=${{ env.REGISTRY }}/${IMAGE_NAME_LOWER}:${{ github.sha }}" >> $GITHUB_ENV
+          IMAGE_NAME_LOWER=$(echo "${{ env.IMAGE_NAME }}" | tr '[:upper:]' '[:lower:]')
+          echo "IMAGE_NAME_LOWER=${IMAGE_NAME_LOWER}" >> $GITHUB_ENV
 
-      - name: Prepare deployment env file
-        env:
-          FASTAPI_IMAGE_VAL: ${{ env.FASTAPI_IMAGE }}
+      - name: Prepare .env file
         run: |
+          cat > .env <<EOF
+          FASTAPI_IMAGE=${{ env.REGISTRY }}/${IMAGE_NAME_LOWER}:${{ github.sha }}
+          BATIK_MODELS_DIR=/opt/models
+          BATIK_CHECKPOINTS_DIR=/opt/checkpoints
+          BATIK_DATA_DIR=/opt/data
+          PORT=8000
+          DEBUG=false
+          APP_VERSION=1.0.0
+          BATIK_SEARCH_FEATURE_EXTRACTOR_WEIGHTS=/app/models/convnext_feature_extractor.pt
+          EOF
+
+          # Timpa dengan ENV_PROD jika ada (override semua nilai di atas)
           if [ -n "${{ secrets.ENV_PROD }}" ]; then
             printf '%s' "${{ secrets.ENV_PROD }}" > .env
-          else
-            echo "FASTAPI_IMAGE=${FASTAPI_IMAGE_VAL}" > .env
-            echo "BATIK_MODELS_DIR=/opt/models" >> .env
-            echo "BATIK_CHECKPOINTS_DIR=/opt/checkpoints" >> .env
-            echo "BATIK_DATA_DIR=/opt/data" >> .env
-            echo "PORT=8000" >> .env
+            # Pastikan FASTAPI_IMAGE tetap pakai tag commit terbaru
+            sed -i "s|^FASTAPI_IMAGE=.*|FASTAPI_IMAGE=${{ env.REGISTRY }}/${IMAGE_NAME_LOWER}:${{ github.sha }}|" .env
           fi
 
       - name: Copy deployment files to VPS
@@ -126,19 +141,31 @@ jobs:
             set -e
             cd ${{ env.DEPLOY_PATH }}
 
-            # Ensure network exists
-            docker network inspect batik_network >/dev/null 2>&1 || docker network create batik_network
+            # Pastikan network ada
+            docker network inspect batik_network >/dev/null 2>&1 \
+              || docker network create batik_network
 
-            # Pull and deploy
+            # Login ke GHCR
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io \
+              -u ${{ github.actor }} --password-stdin
+
+            # Pull image terbaru
             docker compose pull fastapi
+
+            # Jalankan container
             docker compose up -d --no-build --remove-orphans
 
-            # Health check with retry
+            # Health check dengan retry
+            echo "Waiting for FastAPI to be ready..."
             sleep 5
-            curl --fail --retry 10 --retry-delay 3 http://127.0.0.1:8000/health || {
-              echo "Health check failed"
-              docker compose logs fastapi
+            curl --fail --retry 10 --retry-delay 3 \
+              http://127.0.0.1:8000/health || {
+              echo "❌ Health check failed"
+              docker compose logs fastapi --tail 50
               exit 1
             }
 
-            echo "✅ Deployment successful"
+            # Cleanup image lama
+            docker image prune -f
+
+            echo "✅ Deployment successful: ${{ github.sha }}"
