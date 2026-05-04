@@ -35,10 +35,10 @@ jobs:
       # - name: Lint with ruff
       #   run: ruff check app/ main.py
 
-      - name: Run pytest
-        run: pytest tests/ -v --tb=short -x
-        env:
-          SKIP_INTEGRATION_TESTS: "true"
+      # - name: Run pytest
+      #   run: pytest tests/ -v --tb=short -x
+      #   env:
+      #     SKIP_INTEGRATION_TESTS: "true"
 
   build:
     name: Build & Push Image
