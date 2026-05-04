@@ -57,11 +57,12 @@ ENV PYTHONUNBUFFERED=1
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
 USER appuser
 
-# Health check
+# Health check: respect runtime PORT env (default 8000)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:8000/api/health', timeout=5)"
+    CMD python -c "import os,requests; p=os.getenv('PORT','8000'); requests.get(f'http://localhost:{p}/api/health', timeout=5)"
 
-# Expose port
+# Expose default port
 EXPOSE 8000
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1", "--timeout-keep-alive", "30", "--log-level", "info"]
+# Use shell form so the runtime PORT env is respected by the uvicorn command
+CMD sh -c "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1 --timeout-keep-alive 30 --log-level info"
