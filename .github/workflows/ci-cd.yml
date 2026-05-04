@@ -137,7 +137,7 @@ jobs:
           docker compose --env-file .env.prod up -d --remove-orphans
 
           for attempt in {1..20}; do
-            if curl -fsS http://127.0.0.1:8001/api/health; then
+            if curl -fsS http://127.0.0.1:8000/api/health; then
               echo "Health check passed"
               exit 0
             fi
