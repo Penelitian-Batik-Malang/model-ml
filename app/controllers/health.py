@@ -1,6 +1,6 @@
 import logging
 import time
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Request, status
 from app.schemas.response import APIResponse, HealthCheckResponse
 from app.services.model_loader import get_model_loader
 from app.config.settings import settings
@@ -22,7 +22,7 @@ START_TIME = time.time()
     description="Check service health dan status model loading. Tidak memerlukan API Key.",
 )
 @limiter.limit(HEALTH_LIMIT)
-async def health_check():
+async def health_check(request: Request):
     """
     Health check endpoint.
     
