@@ -3,7 +3,15 @@ __pycache__/
 *.py[cod]
 *$py.class
 venv/
+.venv/
+.python-version
 .env
+.env.*
+
+# Packaging
+build/
+dist/
+*.egg-info/
 
 # Models and Checkpoints (Large Files)
 models/*
@@ -16,9 +24,23 @@ sessions/*
 data/*
 !data/README.md
 
+# Test & Lint
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+coverage/
+
 # Docker
 .docker/
 *.log
+docker-compose.yml
+
+models/
+checkpoints/
+data/
+copilot-instructions.md
 
 # OS
 .DS_Store
