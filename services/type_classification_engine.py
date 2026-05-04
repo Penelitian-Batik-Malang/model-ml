@@ -9,10 +9,10 @@ import torch.nn as nn
 from torchvision import transforms, models
 import cv2
 
-from config import BATIK_TYPE_MODEL_PT
+from config import BASE_DIR
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-DEFAULT_MODEL_PATH = str(BATIK_TYPE_MODEL_PT)
+DEFAULT_MODEL_PATH = str(BASE_DIR / "models" / "model_ConvNextTiny_original_all.pt")
 
 clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
 transform = transforms.Compose([
