@@ -83,9 +83,9 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
 
     env:
-      VPS_HOST: ${{ vars.VPS_HOST }}
-      VPS_USER: ${{ vars.VPS_USER }}
-      VPS_SSH_PORT: ${{ vars.VPS_SSH_PORT }}
+      VPS_HOST: ${{ secrets.VPS_HOST }}
+      VPS_USER: ${{ secrets.VPS_USER }}
+      VPS_SSH_PORT: ${{ secrets.VPS_SSH_PORT }}
       VPS_SSH_PASSPHRASE: ${{ secrets.VPS_SSH_PASSPHRASE }}
       GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
       ENV_PROD: ${{ secrets.ENV_PROD }}
