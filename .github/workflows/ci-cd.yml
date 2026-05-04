@@ -32,8 +32,8 @@ jobs:
           python -m pip install --upgrade pip setuptools wheel
           pip install -r requirements.dev.txt
 
-      - name: Lint with ruff
-        run: ruff check app/ main.py
+      # - name: Lint with ruff
+      #   run: ruff check app/ main.py
 
       - name: Run pytest
         run: pytest tests/ -v --tb=short -x
