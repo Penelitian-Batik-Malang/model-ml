@@ -9,7 +9,7 @@ from uuid import uuid4
 
 import numpy as np
 import requests
-from fastapi import APIRouter, File, Form, UploadFile, status
+from fastapi import APIRouter, File, Form, Request, UploadFile, status
 from fastapi.responses import JSONResponse
 from PIL import Image
 from pycocotools import mask as mask_api
@@ -127,7 +127,7 @@ async def _read_valid_image(file: UploadFile) -> bytes:
     summary="Fashion segmentation",
 )
 @limiter.limit(CBIR_LIMIT)
-async def fashion_segment(image: UploadFile = File(...)) -> Dict[str, Any]:
+async def fashion_segment(request: Request, image: UploadFile = File(...)) -> Dict[str, Any]:
     try:
         file_content = await _read_valid_image(image)
     except ValueError as exc:
@@ -244,6 +244,7 @@ async def fashion_segment(image: UploadFile = File(...)) -> Dict[str, Any]:
 )
 @limiter.limit(CLASSIFY_LIMIT)
 async def blend_manual(
+    request: Request,
     session_id: str = Form(...),
     part: str = Form(...),
     instance_index: int = Form(0),
@@ -324,6 +325,7 @@ def _download_batik_image(url: str) -> np.ndarray:
 )
 @limiter.limit(CBIR_LIMIT)
 async def blend_from_cbir(
+    request: Request,
     session_id: str = Form(...),
     part: str = Form(...),
     instance_index: int = Form(0),
@@ -394,7 +396,7 @@ async def blend_from_cbir(
     summary="Reset session",
 )
 @limiter.limit(CLASSIFY_LIMIT)
-async def reset_session(session_id: str = Form(...)) -> Dict[str, Any]:
+async def reset_session(request: Request, session_id: str = Form(...)) -> Dict[str, Any]:
     if not session_exists(session_id):
         return JSONResponse(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -427,7 +429,7 @@ async def reset_session(session_id: str = Form(...)) -> Dict[str, Any]:
     summary="Get session",
 )
 @limiter.limit(CLASSIFY_LIMIT)
-async def get_session(session_id: str) -> Dict[str, Any]:
+async def get_session(request: Request, session_id: str) -> Dict[str, Any]:
     if not session_exists(session_id):
         return JSONResponse(
             status_code=status.HTTP_404_NOT_FOUND,
