@@ -136,8 +136,12 @@ jobs:
           docker compose --env-file .env.prod pull
           docker compose --env-file .env.prod up -d --remove-orphans
 
-          for attempt in {1..20}; do
-            if curl -fsS http://127.0.0.1:8000/api/health || curl -fsS http://127.0.0.1:8001/api/health; then
+          PORT=\$(grep -E '^PORT=' .env.prod | cut -d= -f2 | tr -d '\r' || true)
+          PORT=\${PORT:-8000}
+
+          for attempt in {1..30}; do
+            status=\$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:\${PORT}/api/health" || true)
+            if [ "\${status}" = "200" ]; then
               echo "Health check passed"
               exit 0
             fi
@@ -145,5 +149,7 @@ jobs:
           done
 
           echo "Health check failed"
+          docker compose --env-file .env.prod ps || true
+          docker logs --tail 200 batik_fastapi || true
           exit 1
           EOF
