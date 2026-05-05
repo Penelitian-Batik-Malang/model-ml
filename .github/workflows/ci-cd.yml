@@ -139,14 +139,20 @@ jobs:
           PORT=\$(grep -E '^PORT=' .env.prod | cut -d= -f2 | tr -d '\r' || true)
           PORT=\${PORT:-8000}
 
+          health_ok=0
           for attempt in {1..30}; do
             status=\$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:\${PORT}/api/health" || true)
             if [ "\${status}" = "200" ]; then
               echo "Health check passed"
-              exit 0
+              health_ok=1
+              break
             fi
             sleep 5
           done
+
+          if [ "\${health_ok}" = "1" ]; then
+            exit 0
+          fi
 
           echo "Health check failed"
           docker compose --env-file .env.prod ps || true
