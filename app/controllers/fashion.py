@@ -210,13 +210,22 @@ async def fashion_segment(request: Request, image: UploadFile = File(...)) -> Di
         if busana_result is not None:
             final_mask, label_upper_body, _idx_upper_body = busana_result
             fashion_rgb = load_image_rgb(current_path)
+            import cv2
             query_centroids = extract_query_centroids(fashion_rgb, final_mask, kluster=3)
+            
+            # Convert LAB centroids to RGB for frontend rendering
+            query_centroids_rgb = cv2.cvtColor(
+                query_centroids.reshape(-1, 1, 3), cv2.COLOR_LAB2RGB
+            ).reshape(-1, 3)
+            query_centroids_rgb = np.clip(query_centroids_rgb * 255.0, 0, 255).astype(int)
+
             cbir_data = retrieve_batik(query_centroids, fashion_db, top_k_list=[5, 10, 15])
             cbir_response = {
                 "selected_label": PART_LABELS.get(label_upper_body, f"class_{label_upper_body}"),
                 "selected_class_id": label_upper_body,
                 "pixel_count": int(np.sum(final_mask)),
                 "query_centroids": query_centroids.tolist(),
+                "query_centroids_rgb": query_centroids_rgb.tolist(),
                 **cbir_data,
             }
 
@@ -290,12 +299,16 @@ async def blend_manual(
         )
 
     current_rgb = load_image_rgb(current_path)
+    fashion_rgb = load_image_rgb(session_dir / "fashion.jpg")
     batik_path = session_dir / "batik_upload.jpg"
     _save_bytes(batik_bytes, batik_path)
     batik_rgb = load_image_rgb(batik_path)
 
     if selected_mask.shape != current_rgb.shape[:2]:
         selected_mask = resize_mask_to_image(selected_mask, current_rgb.shape[:2])
+
+    mask_bool = selected_mask > 0
+    current_rgb[mask_bool] = fashion_rgb[mask_bool]
 
     blended_rgb = multiply_blend(selected_mask, current_rgb, batik_rgb)
     save_image_from_rgb(blended_rgb, current_path)
@@ -372,9 +385,13 @@ async def blend_from_cbir(
         )
 
     current_rgb = load_image_rgb(current_path)
+    fashion_rgb = load_image_rgb(session_dir / "fashion.jpg")
 
     if selected_mask.shape != current_rgb.shape[:2]:
         selected_mask = resize_mask_to_image(selected_mask, current_rgb.shape[:2])
+
+    mask_bool = selected_mask > 0
+    current_rgb[mask_bool] = fashion_rgb[mask_bool]
 
     blended_rgb = multiply_blend(selected_mask, current_rgb, batik_rgb)
     save_image_from_rgb(blended_rgb, current_path)

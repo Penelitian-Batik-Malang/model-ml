@@ -1,22 +1,212 @@
-import os
 import subprocess
-import sys
 from pathlib import Path
 from typing import Dict, Optional, Tuple
 
 import numpy as np
+from PIL import Image
 from pycocotools import mask as mask_api
 
-from app.config.fashion import (
-    FASHION_DETECTION_DIR,
-    FASHION_CHECKPOINT_PATH,
-    FASHION_LABEL_MAP_PATH,
-    FASHION_CONFIG_FILE,
-    FASHION_INFERENCE_SCRIPT,
-    TPU_DIR,
-)
+from app.config.fashion import FASHION_SAVED_MODEL_DIR
 from app.utils.image_processing import encode_mask_rgba_base64
 from app.utils.session_handler import set_detected_parts
+
+_saved_fashionpedia_model = None
+
+
+def _yxyx_to_xywh(boxes: np.ndarray) -> np.ndarray:
+    boxes = np.asarray(boxes)
+    if boxes.size == 0:
+        return boxes
+    ymin = boxes[..., 0]
+    xmin = boxes[..., 1]
+    ymax = boxes[..., 2]
+    xmax = boxes[..., 3]
+    width = xmax - xmin
+    height = ymax - ymin
+    return np.stack([xmin, ymin, width, height], axis=-1)
+
+
+def _paste_instance_masks(
+    masks: np.ndarray, detected_boxes: np.ndarray, image_height: int, image_width: int
+) -> np.ndarray:
+    _, mask_height, mask_width = masks.shape
+    scale = max((mask_width + 2.0) / mask_width, (mask_height + 2.0) / mask_height)
+    w_half = detected_boxes[:, 2] * 0.5
+    h_half = detected_boxes[:, 3] * 0.5
+    x_c = detected_boxes[:, 0] + w_half
+    y_c = detected_boxes[:, 1] + h_half
+    boxes_exp = np.zeros(detected_boxes.shape, dtype=np.int32)
+    boxes_exp[:, 0] = (x_c - w_half * scale).astype(np.int32)
+    boxes_exp[:, 2] = (x_c + w_half * scale).astype(np.int32)
+    boxes_exp[:, 1] = (y_c - h_half * scale).astype(np.int32)
+    boxes_exp[:, 3] = (y_c + h_half * scale).astype(np.int32)
+
+    padded_mask = np.zeros((mask_height + 2, mask_width + 2), dtype=np.float32)
+    segms = []
+    for mask_ind, mask in enumerate(masks):
+        im_mask = np.zeros((image_height, image_width), dtype=np.uint8)
+        padded_mask[1:-1, 1:-1] = mask[:, :]
+        ref_box = boxes_exp[mask_ind, :]
+        w = max(ref_box[2] - ref_box[0] + 1, 1)
+        h = max(ref_box[3] - ref_box[1] + 1, 1)
+        mask_resized = Image.fromarray(padded_mask).resize((w, h), resample=Image.BILINEAR)
+        mask_bin = (np.array(mask_resized) > 0.5).astype(np.uint8)
+        x_0 = min(max(ref_box[0], 0), image_width)
+        x_1 = min(max(ref_box[2] + 1, 0), image_width)
+        y_0 = min(max(ref_box[1], 0), image_height)
+        y_1 = min(max(ref_box[3] + 1, 0), image_height)
+        im_mask[y_0:y_1, x_0:x_1] = mask_bin[
+            (y_0 - ref_box[1]):(y_1 - ref_box[1]),
+            (x_0 - ref_box[0]):(x_1 - ref_box[0]),
+        ]
+        segms.append(im_mask)
+    return np.array(segms, dtype=np.uint8)
+
+
+def _encode_rle_mask(mask: np.ndarray) -> Dict:
+    if mask.ndim == 3 and mask.shape[2] == 1:
+        mask = mask[:, :, 0]
+    mask_uint8 = np.asfortranarray((mask > 0).astype(np.uint8))
+    encoded = mask_api.encode(mask_uint8)
+    if isinstance(encoded.get("counts"), bytes):
+        encoded["counts"] = encoded["counts"].decode("utf-8")
+    return encoded
+
+
+def _load_saved_model():
+    global _saved_fashionpedia_model
+    if _saved_fashionpedia_model is not None:
+        return _saved_fashionpedia_model
+
+    import tensorflow as tf
+
+    if not FASHION_SAVED_MODEL_DIR.exists():
+        raise FileNotFoundError(f"Saved model not found: {FASHION_SAVED_MODEL_DIR}")
+
+    _saved_fashionpedia_model = tf.saved_model.load(str(FASHION_SAVED_MODEL_DIR))
+    return _saved_fashionpedia_model
+
+
+def _run_saved_model_segmentation(
+    image_path: Path, output_npy: Path, output_html: Path
+) -> subprocess.CompletedProcess:
+    model = _load_saved_model()
+    sig = model.signatures.get("serving_default") or list(model.signatures.values())[0]
+
+    with open(image_path, "rb") as reader:
+        image_bytes = reader.read()
+
+    import tensorflow as tf
+
+    try:
+        outputs = sig(tf.constant([image_bytes]))
+    except Exception:
+        image = Image.open(image_path).convert("RGB")
+        array = np.asarray(image, dtype=np.float32) / 255.0
+        array = np.expand_dims(array, axis=0)
+        outputs = sig(tf.constant(array))
+
+    outputs_np = {k: v.numpy() for k, v in outputs.items()}
+    boxes = outputs_np.get("detection_boxes")
+    scores = outputs_np.get("detection_scores")
+    classes = outputs_np.get("detection_classes")
+    masks = outputs_np.get("detection_masks")
+    num = outputs_np.get("num_detections")
+
+    if num is not None:
+        n = int(np.asarray(num).reshape(-1)[0])
+    else:
+        n = boxes.shape[1] if boxes is not None else 0
+
+    def _maybe_first(x):
+        if x is None:
+            return None
+        arr = np.asarray(x)
+        if arr.ndim >= 2 and arr.shape[0] == 1:
+            arr = arr[0]
+        return arr
+
+    boxes = _maybe_first(boxes)
+    scores = _maybe_first(scores)
+    classes = _maybe_first(classes)
+    masks = _maybe_first(masks)
+
+    if boxes is not None:
+        boxes = boxes[:n]
+    if scores is not None:
+        scores = scores[:n]
+    if classes is not None:
+        classes = classes[:n].astype(np.int32)
+    if masks is not None:
+        masks = masks[:n]
+
+    image = Image.open(image_path).convert("RGB")
+    image_height, image_width = image.size[1], image.size[0]
+
+    image_info = outputs_np.get("image_info")
+    if image_info is not None:
+        try:
+            image_info_arr = np.asarray(image_info)
+            if image_info_arr.ndim >= 3:
+                scale_y = float(image_info_arr[0][2][0])
+                scale_x = float(image_info_arr[0][2][1])
+            elif image_info_arr.ndim == 2:
+                scale_y = float(image_info_arr[2][0])
+                scale_x = float(image_info_arr[2][1])
+            else:
+                scale_y = 1024.0 / image_height
+                scale_x = 1024.0 / image_width
+        except Exception:
+            scale_y = 1024.0 / image_height
+            scale_x = 1024.0 / image_width
+    else:
+        scale_y = 1024.0 / image_height
+        scale_x = 1024.0 / image_width
+
+    if boxes is not None:
+        boxes = np.asarray(boxes, dtype=np.float32).copy()
+        if boxes.size:
+            if boxes.max() <= 1.0:
+                boxes[:, [0, 2]] *= image_height
+                boxes[:, [1, 3]] *= image_width
+            else:
+                boxes[:, [0, 2]] /= scale_y
+                boxes[:, [1, 3]] /= scale_x
+
+    if boxes is not None and masks is not None:
+        boxes_xywh = _yxyx_to_xywh(boxes)
+        masks = _paste_instance_masks(masks, boxes_xywh, image_height, image_width)
+        encoded_masks = [_encode_rle_mask(mask) for mask in masks]
+    else:
+        encoded_masks = [None] * n
+
+    if classes is None:
+        classes = np.zeros((n,), dtype=np.int32)
+    if scores is None:
+        scores = np.zeros((n,), dtype=np.float32)
+
+    result = {
+        "classes": classes.tolist(),
+        "scores": scores.tolist(),
+        "masks": encoded_masks,
+    }
+
+    np.save(str(output_npy), result, allow_pickle=True)
+    try:
+        output_html.parent.mkdir(parents=True, exist_ok=True)
+        output_html.write_text("")
+    except Exception:
+        pass
+
+    return subprocess.CompletedProcess(args=[str(FASHION_SAVED_MODEL_DIR)], returncode=0, stdout="saved model inference", stderr="")
+
+
+def run_fashion_segmentation(
+    image_path: Path, output_npy: Path, output_html: Path, timeout_seconds: int
+) -> subprocess.CompletedProcess:
+    if not FASHION_SAVED_MODEL_DIR.exists():
+        raise FileNotFoundError(f"Saved model not found: {FASHION_SAVED_MODEL_DIR}")
+    return _run_saved_model_segmentation(image_path, output_npy, output_html)
 
 PART_IDS_BLENDING = {28, 29, 30, 31, 32, 33, 34}
 UPPER_BODY_IDS = {1, 2, 3, 4, 5, 6, 10, 11, 12, 13}
@@ -60,47 +250,6 @@ PART_COLORS = {
     "neckline": [255, 255, 80, 128],
     "epaulette": [80, 220, 220, 128],
 }
-
-
-def _build_env() -> Dict[str, str]:
-    env = os.environ.copy()
-    env["PYTHONPATH"] = os.pathsep.join(
-        [
-            str(FASHION_DETECTION_DIR),
-            str(TPU_DIR / "models"),
-            str(TPU_DIR / "models" / "official" / "efficientnet"),
-            str(TPU_DIR / "models" / "hyperparameters"),
-        ]
-    )
-    return env
-
-
-def run_fashion_segmentation(
-    image_path: Path, output_npy: Path, output_html: Path, timeout_seconds: int
-) -> subprocess.CompletedProcess:
-    cmd = [
-        sys.executable,
-        str(FASHION_INFERENCE_SCRIPT),
-        "--model=attribute_mask_rcnn",
-        "--image_size=640",
-        f"--checkpoint_path={FASHION_CHECKPOINT_PATH}",
-        f"--label_map_file={FASHION_LABEL_MAP_PATH}",
-        f"--config_file={FASHION_CONFIG_FILE}",
-        f"--image_file_pattern={image_path}",
-        f"--output_html={output_html}",
-        "--max_boxes_to_draw=15",
-        "--min_score_threshold=0.05",
-        f"--output_file={output_npy}",
-    ]
-    env = _build_env()
-    return subprocess.run(
-        cmd,
-        cwd=str(FASHION_DETECTION_DIR),
-        env=env,
-        capture_output=True,
-        text=True,
-        timeout=timeout_seconds,
-    )
 
 
 def load_segmentation_result(output_npy: Path) -> Dict:

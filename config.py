@@ -6,21 +6,16 @@ BASE_DIR = Path(__file__).resolve().parent
 # ==========================================
 # 1. FASHIONPEDIA SEGMENTATION CONFIGURATION
 # ==========================================
-TPU_DIR = BASE_DIR / "tpu"
-FASHION_DETECTION_DIR = TPU_DIR / "models" / "official" / "detection"
-FASHION_PROJECT_DIR = FASHION_DETECTION_DIR / "projects" / "fashionpedia"
-
-FASHION_CHECKPOINT_PATH = BASE_DIR / "checkpoints" / "fashionpedia-r50-fpn" / "model.ckpt"
-FASHION_LABEL_MAP_PATH = FASHION_PROJECT_DIR / "dataset" / "fashionpedia_label_map.csv"
-FASHION_CONFIG_FILE = FASHION_PROJECT_DIR / "configs" / "yaml" / "r50fpn_amrcnn.yaml"
-FASHION_INFERENCE_SCRIPT = FASHION_DETECTION_DIR / "inference_fashionpedia.py"
+# Using exported saved model under `models/` (no TPU repo required)
+FASHION_SAVED_MODEL_DIR = BASE_DIR / "models"
 
 # ==========================================
 # 2. FASHION RECOMMENDATION (CBIR) CONFIG
 # ==========================================
 # URL public S3 IDCloudHost untuk gambar hasil rekomendasi warna
-S3_BATIK_FASHION_ROOT_URL = "https://is3.cloudhost.id/color-dominant-batik" 
-FASHION_CBIR_FEATURES_NPZ = BASE_DIR / "data" / "batik_skenario_3_warna.npz"
+S3_BATIK_FASHION_ROOT_URL = "https://is3.cloudhost.id/color-dominant-batik"
+# Updated filename after data refactor
+FASHION_CBIR_FEATURES_NPZ = BASE_DIR / "data" / "fitur_warna_dominan_batik_rekomendasi_by_fashion.npz"
 
 # ==========================================
 # 3. GENERAL BATIK SEARCH CONFIGURATION

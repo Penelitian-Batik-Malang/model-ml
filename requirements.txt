@@ -22,9 +22,10 @@ pandas==2.2.3
 # ==========================================
 # Core Machine Learning & Deep Learning (API Runtime)
 # ==========================================
-torch==2.3.1 --index-url https://download.pytorch.org/whl/cpu
-torchvision==0.18.1 --index-url https://download.pytorch.org/whl/cpu
 tensorflow-cpu==2.17.0
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.3.1
+torchvision==0.18.1
 
 # Library Pendukung Inferensi & Image Processing
 opencv-python==4.10.0.84
@@ -38,6 +39,12 @@ scikit-image==0.23.2
 transformers==4.40.0
 faiss-cpu==1.8.0
 pycocotools==2.0.7
+
+# Notes:
+# - On Windows, installing `faiss-cpu` and `pycocotools` via pip may fail.
+#   Use conda (recommended) or prebuilt wheels for Windows:
+#     conda install -c conda-forge faiss-cpu pycocotools
+# - PyTorch CPU wheels are pulled from the extra index above.
 
 # ==========================================
 # Miscellaneous & Security
