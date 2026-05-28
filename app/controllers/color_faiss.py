@@ -113,7 +113,7 @@ async def color_palette_faiss(
             )
 
         image_bgr = _load_image(file_content)
-        resized = Resize.proportional_resize(image_bgr, settings.COLOR_FAISS_MAX_SIZE)
+        resized = Resize.proportional_resize(image_bgr, 384)
         palette, _ = ExtractDominantColor.extract_palette_and_vector_s1(resized, num_cluster)
 
         response_payload = {
@@ -215,13 +215,12 @@ async def get_recommendation_faiss(
         selected_slots = _parse_selected_colors(selected_colors, num_cluster)
 
         image_bgr = _load_image(file_content)
-        resized = Resize.proportional_resize(image_bgr, settings.COLOR_FAISS_MAX_SIZE)
+        resized = Resize.proportional_resize(image_bgr, 384)
         feature_vector = ExtractDominantColor.extract_dominant_colors_s1(resized, num_cluster)
 
         retriever = get_color_faiss_retriever(
             settings.DATA_PATH,
-            settings.COLOR_FAISS_SCENARIO,
-            settings.COLOR_FAISS_CANDIDATE_MULTIPLIER,
+            20,
         )
 
         results = await asyncio.to_thread(

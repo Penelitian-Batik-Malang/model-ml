@@ -32,11 +32,6 @@ data/*
 .coverage.*
 coverage/
 
-# Docker
-.docker/
-*.log
-docker-compose.yml
-
 models/
 checkpoints/
 data/
