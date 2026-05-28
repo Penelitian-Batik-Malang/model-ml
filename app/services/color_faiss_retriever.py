@@ -121,8 +121,8 @@ class ColorFaissRetriever:
 _color_faiss_retriever: Optional[ColorFaissRetriever] = None
 
 
-def get_color_faiss_retriever(data_dir: str, scenario: str, candidate_multiplier: int) -> ColorFaissRetriever:
+def get_color_faiss_retriever(data_dir: str, candidate_multiplier: int) -> ColorFaissRetriever:
     global _color_faiss_retriever
     if _color_faiss_retriever is None:
-        _color_faiss_retriever = ColorFaissRetriever(data_dir, scenario, candidate_multiplier)
+        _color_faiss_retriever = ColorFaissRetriever(data_dir, candidate_multiplier=candidate_multiplier)
     return _color_faiss_retriever

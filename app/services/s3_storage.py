@@ -1,4 +1,5 @@
 import logging
+import urllib.parse
 from typing import Optional
 
 import boto3
@@ -40,12 +41,26 @@ class S3Storage:
         if not image_path:
             return ""
 
-        base = self.base_path or ""
-        cleaned = image_path
-        if base and cleaned.startswith(base):
-            cleaned = cleaned[len(base):]
-        cleaned = cleaned.lstrip("/\\")
-        return cleaned.replace("\\", "/")
+        cleaned = image_path.replace("\\", "/")
+
+        buckets = {b for b in [self.bucket, self.bucket_cbir, self.bucket_color_faiss] if b}
+        for bucket in buckets:
+            prefix = bucket.rstrip("/") + "/"
+            if cleaned.startswith(prefix):
+                cleaned = cleaned[len(prefix):]
+                break
+
+        base = (self.base_path or "").replace("\\", "/").rstrip("/")
+        if base:
+            encoded_base = urllib.parse.quote(base, safe="/")
+            variants = {base, base.lstrip("/"), encoded_base, encoded_base.lstrip("/")}
+            for variant in variants:
+                if variant and cleaned.startswith(variant):
+                    cleaned = cleaned[len(variant):]
+                    break
+
+        cleaned = cleaned.lstrip("/")
+        return cleaned
 
     def generate_presigned_url(self, key: str, bucket_name: Optional[str] = None) -> Optional[str]:
         bucket = self.resolve_bucket(bucket_name)

@@ -40,7 +40,7 @@ class Settings(BaseSettings):
     TIMEOUT_KEEP_ALIVE: int = 30
     
     # API security
-    API_KEY: str = os.getenv("API_KEY", "your-secret-api-key")
+    API_KEY: str = os.getenv("API_KEY", "")
     
     # Model settings
     MODEL_PATH: str = _resolve_existing_path("MODEL_PATH", "/app/models", REPO_ROOT / "models")
@@ -78,11 +78,6 @@ class Settings(BaseSettings):
         "",
     )
     CBIR_TOP_K: int = int(os.getenv("CBIR_TOP_K", 5))
-
-    # Color FAISS settings
-    COLOR_FAISS_SCENARIO: str = os.getenv("COLOR_FAISS_SCENARIO", "s1")
-    COLOR_FAISS_MAX_SIZE: int = int(os.getenv("COLOR_FAISS_MAX_SIZE", 384))
-    COLOR_FAISS_CANDIDATE_MULTIPLIER: int = int(os.getenv("COLOR_FAISS_CANDIDATE_MULTIPLIER", 20))
 
     # S3 settings
     S3_ACCESS_KEY_ID: str = os.getenv("AWS_ACCESS_KEY_ID", "")
