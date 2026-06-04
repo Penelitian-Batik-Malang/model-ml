@@ -342,6 +342,7 @@ def build_parts_response(result: Dict, session_id: Optional[str] = None) -> Dict
     part_masks = {name: [] for name in PART_COLORS.keys()}
     parts = {name: [] for name in PART_COLORS.keys()}
     upper_body_instances = []
+    blending_instances = []
     image_shape = None
 
     for index in range(num_instances):
@@ -375,18 +376,39 @@ def build_parts_response(result: Dict, session_id: Optional[str] = None) -> Dict
             )
         elif class_id in PART_IDS_BLENDING:
             part_name = PART_LABELS.get(class_id, f"part_{class_id}")
-            part_masks.setdefault(part_name, []).append(mask)
-            parts[part_name].append(
-                {
-                    "index": len(parts[part_name]),
-                    "bbox": _object_bbox(mask),
+            part_idx = len(parts[part_name])
+            blending_instances.append((part_name, part_idx, mask, score))
+            parts[part_name].append(None) # placeholder
+
+    # Resolve overlaps among blending instances
+    blending_instances_with_area = [
+        (p_name, p_idx, mask, score, _mask_area(mask))
+        for p_name, p_idx, mask, score in blending_instances
+    ]
+    blending_instances_with_area.sort(key=lambda x: x[4], reverse=True)
+    
+    claimed_blending = np.zeros(image_shape, dtype=bool) if image_shape else None
+    resolved_blending = []
+    
+    if claimed_blending is not None:
+        for p_name, p_idx, mask, score, area in blending_instances_with_area:
+            resolved_mask = np.logical_and(mask, np.logical_not(claimed_blending)).astype(np.uint8)
+            claimed_blending = np.logical_or(claimed_blending, mask)
+            
+            new_area = _mask_area(resolved_mask)
+            if new_area > 0:
+                parts[p_name][p_idx] = {
+                    "index": p_idx,
+                    "bbox": _object_bbox(resolved_mask),
                     "mask_b64": encode_mask_rgba_base64(
-                        mask, PART_COLORS.get(part_name, [255, 255, 255, 128])
+                        resolved_mask, PART_COLORS.get(p_name, [255, 255, 255, 128])
                     ),
-                    "area": _mask_area(mask),
+                    "area": new_area,
                     "score": round(score, 3),
                 }
-            )
+                resolved_blending.append((p_name, resolved_mask))
+            else:
+                parts[p_name][p_idx] = None
 
     # Resolve overlaps among upper body instances (largest proportion wins the pixels)
     upper_body_instances_with_area = [
@@ -407,9 +429,8 @@ def build_parts_response(result: Dict, session_id: Optional[str] = None) -> Dict
 
     for part_name, part_idx, ub_mask in upper_body_instances:
         final_ub_mask = ub_mask.copy()
-        for masks_list in part_masks.values():
-            for p_mask in masks_list:
-                final_ub_mask = np.logical_and(final_ub_mask, np.logical_not(p_mask)).astype(np.uint8)
+        for p_name, p_mask in resolved_blending:
+            final_ub_mask = np.logical_and(final_ub_mask, np.logical_not(p_mask)).astype(np.uint8)
 
         area_final = _mask_area(final_ub_mask)
         if area_final == 0:
