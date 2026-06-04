@@ -388,21 +388,49 @@ def build_parts_response(result: Dict, session_id: Optional[str] = None) -> Dict
                 }
             )
 
+    # Resolve overlaps among upper body instances (largest proportion wins the pixels)
+    upper_body_instances_with_area = [
+        (p_name, p_idx, mask, _mask_area(mask))
+        for p_name, p_idx, mask in upper_body_instances
+    ]
+    upper_body_instances_with_area.sort(key=lambda x: x[3], reverse=True)
+    
+    claimed_upper = np.zeros(image_shape, dtype=bool) if image_shape else None
+    resolved_upper_body = []
+    
+    if claimed_upper is not None:
+        for p_name, p_idx, mask, area in upper_body_instances_with_area:
+            resolved_mask = np.logical_and(mask, np.logical_not(claimed_upper)).astype(np.uint8)
+            claimed_upper = np.logical_or(claimed_upper, mask)
+            resolved_upper_body.append((p_name, p_idx, resolved_mask))
+        upper_body_instances = resolved_upper_body
+
     for part_name, part_idx, ub_mask in upper_body_instances:
         final_ub_mask = ub_mask.copy()
         for masks_list in part_masks.values():
             for p_mask in masks_list:
                 final_ub_mask = np.logical_and(final_ub_mask, np.logical_not(p_mask)).astype(np.uint8)
 
-        parts[part_name][part_idx]["bbox"] = _object_bbox(final_ub_mask)
-        parts[part_name][part_idx]["mask_b64"] = encode_mask_rgba_base64(
-            final_ub_mask, PART_COLORS.get(part_name, [128, 128, 128, 128])
-        )
-        parts[part_name][part_idx]["area"] = _mask_area(final_ub_mask)
-        del parts[part_name][part_idx]["original_mask"]
+        area_final = _mask_area(final_ub_mask)
+        if area_final == 0:
+            parts[part_name][part_idx] = None
+        else:
+            parts[part_name][part_idx]["bbox"] = _object_bbox(final_ub_mask)
+            parts[part_name][part_idx]["mask_b64"] = encode_mask_rgba_base64(
+                final_ub_mask, PART_COLORS.get(part_name, [128, 128, 128, 128])
+            )
+            parts[part_name][part_idx]["area"] = area_final
+            if "original_mask" in parts[part_name][part_idx]:
+                del parts[part_name][part_idx]["original_mask"]
 
     height, width = image_shape if image_shape is not None else (0, 0)
-    clean_parts = {k: v for k, v in parts.items() if len(v) > 0}
+    
+    # Filter out None and empty lists
+    clean_parts = {}
+    for k, v in parts.items():
+        valid_items = [item for item in v if item is not None]
+        if valid_items:
+            clean_parts[k] = valid_items
     detected_keys = list(clean_parts.keys())
 
     if session_id is not None:
