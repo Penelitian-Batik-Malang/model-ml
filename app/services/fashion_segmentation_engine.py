@@ -396,7 +396,8 @@ def build_parts_response(result: Dict, session_id: Optional[str] = None) -> Dict
             claimed_blending = np.logical_or(claimed_blending, mask)
             
             new_area = _mask_area(resolved_mask)
-            if new_area > 0:
+            # Jika mask sisa terlalu kecil atau sisa proporsinya < 25%, anggap sebagai duplikat/noise dan hapus
+            if new_area > 300 and (new_area / max(area, 1)) >= 0.25:
                 parts[p_name][p_idx] = {
                     "index": p_idx,
                     "bbox": _object_bbox(resolved_mask),
@@ -424,7 +425,10 @@ def build_parts_response(result: Dict, session_id: Optional[str] = None) -> Dict
         for p_name, p_idx, mask, area in upper_body_instances_with_area:
             resolved_mask = np.logical_and(mask, np.logical_not(claimed_upper)).astype(np.uint8)
             claimed_upper = np.logical_or(claimed_upper, mask)
-            resolved_upper_body.append((p_name, p_idx, resolved_mask))
+            
+            new_area = _mask_area(resolved_mask)
+            if new_area > 300 and (new_area / max(area, 1)) >= 0.25:
+                resolved_upper_body.append((p_name, p_idx, resolved_mask))
         upper_body_instances = resolved_upper_body
 
     for part_name, part_idx, ub_mask in upper_body_instances:
@@ -446,10 +450,10 @@ def build_parts_response(result: Dict, session_id: Optional[str] = None) -> Dict
 
     height, width = image_shape if image_shape is not None else (0, 0)
     
-    # Filter out None and empty lists
+    # Filter out None, empty lists, and invalid components
     clean_parts = {}
     for k, v in parts.items():
-        valid_items = [item for item in v if item is not None]
+        valid_items = [item for item in v if item is not None and item.get("mask_b64") is not None]
         if valid_items:
             clean_parts[k] = valid_items
     detected_keys = list(clean_parts.keys())
