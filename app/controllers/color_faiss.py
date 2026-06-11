@@ -1,7 +1,7 @@
 import asyncio
 import io
 import logging
-from typing import Annotated, List
+from typing import Annotated, List, Optional
 
 import cv2
 import numpy as np
@@ -21,15 +21,12 @@ from app.utils.response import ResponseBuilder
 logger = logging.getLogger(__name__)
 router = APIRouter()
 INVALID_REQUEST_MESSAGE = "Invalid request"
+DEFAULT_NUM_CLUSTER = ExtractDominantColor.MAX_CLUSTERS
 
 
-def _validate_num_cluster(num_cluster: int) -> bool:
-    return num_cluster in {3, 4, 5}
-
-
-def _parse_selected_colors(value: str, num_cluster: int) -> List[int]:
+def _parse_selected_colors(value: str, num_cluster: int = DEFAULT_NUM_CLUSTER) -> Optional[List[int]]:
     if not value:
-        return list(range(num_cluster))
+        return None
 
     cleaned = value.replace(";", ",").replace("|", ",")
     items = [item.strip() for item in cleaned.split(",") if item.strip()]
@@ -38,11 +35,11 @@ def _parse_selected_colors(value: str, num_cluster: int) -> List[int]:
     for item in items:
         idx = int(item)
         if idx < 1 or idx > num_cluster:
-            raise ValueError("selected_colors out of range")
+            raise ValueError(f"selected_colors out of range {num_cluster}")
         indices.append(idx - 1)
 
     if not indices:
-        return list(range(num_cluster))
+        return None
 
     return sorted(set(indices))
 
@@ -64,19 +61,8 @@ def _load_image(file_content: bytes) -> np.ndarray:
 async def color_palette_faiss(
     request: Request,
     file: Annotated[UploadFile, File(...)],
-    num_cluster: Annotated[int, Form(...)],
 ):
     try:
-        if not _validate_num_cluster(num_cluster):
-            return JSONResponse(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                content=ResponseBuilder.error(
-                    message="Invalid num_cluster",
-                    status=400,
-                    errors=["num_cluster must be 3, 4, or 5"],
-                ).model_dump(),
-            )
-
         if not file.filename:
             return JSONResponse(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -114,11 +100,35 @@ async def color_palette_faiss(
 
         image_bgr = _load_image(file_content)
         resized = Resize.proportional_resize(image_bgr, 384)
-        palette, _ = ExtractDominantColor.extract_palette_and_vector_s1(resized, num_cluster)
+        result = ExtractDominantColor.extract_dominant_colors_careful(
+            resized,
+            max_clusters=DEFAULT_NUM_CLUSTER,
+        )
+        if result is None:
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content=ResponseBuilder.error(
+                    message="Invalid image",
+                    status=400,
+                    errors=["Unable to extract dominant palette from the image."],
+                ).model_dump(),
+            )
+
+        palette_hex = [
+            ExtractDominantColor.LABELER.lab_to_hex(f["L"], f["a"], f["b"])
+            for f in result["features"]
+        ]
+        
+        colors_array = [
+            [f["L"], f["a"], f["b"], f["P"]]
+            for f in result["features"]
+        ]
 
         response_payload = {
-            "palette": palette,
-            "count": len(palette),
+            "palette": palette_hex,
+            "color_names": result["labels"],
+            "colors": colors_array,
+            "count": len(result["labels"]),
         }
         return JSONResponse(
             status_code=status.HTTP_200_OK,
@@ -152,21 +162,10 @@ async def color_palette_faiss(
 async def get_recommendation_faiss(
     request: Request,
     file: Annotated[UploadFile, File(...)],
-    num_cluster: Annotated[int, Form(...)],
     top_k: Annotated[int, Form()] = 5,
     selected_colors: Annotated[str, Form()] = "",
 ):
     try:
-        if not _validate_num_cluster(num_cluster):
-            return JSONResponse(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                content=ResponseBuilder.error(
-                    message="Invalid num_cluster",
-                    status=400,
-                    errors=["num_cluster must be 3, 4, or 5"],
-                ).model_dump(),
-            )
-
         if top_k <= 0:
             return JSONResponse(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -212,11 +211,33 @@ async def get_recommendation_faiss(
                 ).model_dump(),
             )
 
-        selected_slots = _parse_selected_colors(selected_colors, num_cluster)
+        selected_slots = _parse_selected_colors(selected_colors)
 
         image_bgr = _load_image(file_content)
         resized = Resize.proportional_resize(image_bgr, 384)
-        feature_vector = ExtractDominantColor.extract_dominant_colors_s1(resized, num_cluster)
+        result = ExtractDominantColor.extract_dominant_colors_careful(
+            resized,
+            max_clusters=DEFAULT_NUM_CLUSTER,
+        )
+        if result is None:
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content=ResponseBuilder.error(
+                    message="Invalid image",
+                    status=400,
+                    errors=["Unable to extract dominant palette from the image."],
+                ).model_dump(),
+            )
+
+        k_opt = result["k_optimal"]
+        fvec_actual_4d = result["feature_vector"]
+
+        # Filter: Buang fitur 'P' dari query vector (Ambil L, a, b saja)
+        fvec_actual_3d = []
+        for c_idx in range(k_opt):
+            start_4d = c_idx * 4
+            fvec_actual_3d.extend(fvec_actual_4d[start_4d : start_4d + 3])
+        feature_vector = np.array(fvec_actual_3d, dtype=np.float32)
 
         retriever = get_color_faiss_retriever(
             settings.DATA_PATH,
@@ -226,7 +247,7 @@ async def get_recommendation_faiss(
         results = await asyncio.to_thread(
             retriever.search,
             feature_vector,
-            num_cluster,
+            DEFAULT_NUM_CLUSTER,
             selected_slots,
             top_k,
         )
