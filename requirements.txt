@@ -22,29 +22,46 @@ pandas==2.2.3
 # ==========================================
 # Core Machine Learning & Deep Learning (API Runtime)
 # ==========================================
-tensorflow-cpu==2.17.0
+tensorflow-cpu==2.17.1
 --extra-index-url https://download.pytorch.org/whl/cpu
-torch==2.3.1
-torchvision==0.18.1
+torch==2.3.1+cpu
+torchvision==0.18.1+cpu
 
 # Library Pendukung Inferensi & Image Processing
 opencv-python==4.10.0.84
 Pillow==10.4.0
-ultralytics==8.0.149
+ultralytics==8.3.149
 scikit-learn==1.5.2
 scipy==1.13.1
 numpy==1.26.4
 joblib==1.4.2
 scikit-image==0.23.2
-transformers==4.40.0
+transformers==4.40.2
 faiss-cpu==1.8.0
-pycocotools==2.0.7
+
+# FIX 1: matplotlib 3.8.2 has a circular import bug on Python 3.12.
+#         Upgrade to 3.9.x which resolves the '_version' ImportError.
+matplotlib==3.9.4
+
+# FIX 2: mmpycocotools requires numpy at build time but pip doesn't install
+#         it first. Two options (pick one):
+#
+# Option A (recommended — Windows prebuilt wheel, no compiler needed):
+pycocotools==2.0.8
+#
+# Option B (if you still need mmpycocotools specifically):
+# Install numpy first manually, then install mmpycocotools:
+#   pip install numpy==1.26.4
+#   pip install mmpycocotools==12.0.3
+# Do NOT include mmpycocotools here if using Option A above.
 
 # Notes:
-# - On Windows, installing `faiss-cpu` and `pycocotools` via pip may fail.
-#   Use conda (recommended) or prebuilt wheels for Windows:
-#     conda install -c conda-forge faiss-cpu pycocotools
-# - PyTorch CPU wheels are pulled from the extra index above.
+# - tensorflow-cpu 2.17.1 adds official Python 3.12 support (2.17.0 was 3.11 only).
+# - matplotlib 3.9.x fixes the '_version' circular import present in 3.8.2 on Py3.12.
+# - mmpycocotools replaced with pycocotools 2.0.8 which ships prebuilt Windows wheels.
+# - torch/torchvision pinned to +cpu suffix for clarity with the extra-index-url above.
+# - On Windows, faiss-cpu 1.8.0 may still fail for some builds.
+#   If so, install via conda: conda install -c conda-forge faiss-cpu
 
 # ==========================================
 # Miscellaneous & Security
