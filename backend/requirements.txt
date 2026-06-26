@@ -1,0 +1,15 @@
+fastapi>=0.104.0
+uvicorn[standard]>=0.23.2
+python-multipart>=0.0.6
+torch>=2.0.0
+torchvision>=0.15.0
+diffusers>=0.21.0
+transformers>=4.34.0
+Pillow>=10.0.0
+numpy>=1.24.0
+accelerate
+python-dotenv
+deep-translator
+# ControlNet pipeline dependencies
+controlnet-aux>=0.0.7
+opencv-python>=4.8.0
