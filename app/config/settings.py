@@ -95,7 +95,7 @@ class Settings(BaseSettings):
     S3_PRESIGN_EXPIRES: int = int(os.getenv("S3_PRESIGN_EXPIRES", 3600))
     
     # Request settings
-    MAX_IMAGE_SIZE_MB: int = int(os.getenv("MAX_IMAGE_SIZE_MB", 5))
+    MAX_IMAGE_SIZE_MB: int = int(os.getenv("MAX_IMAGE_SIZE_MB", 20))
     MAX_IMAGE_SIZE_BYTES: int = int(
         os.getenv("MAX_IMAGE_SIZE_BYTES", str(MAX_IMAGE_SIZE_MB * 1024 * 1024))
     )
