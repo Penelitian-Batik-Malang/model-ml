@@ -12,19 +12,18 @@ logger = logging.getLogger(__name__)
 class ColorFaissRetriever:
     """FAISS-based retrieval for dominant color vectors using s2_nodedup_max5 artifacts."""
 
-    def __init__(self, data_dir: str, scenario: str = "s2_nodedup_max5", candidate_multiplier: int = 20) -> None:
+    def __init__(self, data_dir: str, scenario: str = "s2_careful_max5") -> None:
         self.data_dir = Path(data_dir)
         self.scenario = scenario
-        self.candidate_multiplier = candidate_multiplier
         self._cache: Dict[int, dict] = {}
 
     def _bundle_paths(self, num_clusters: int) -> Dict[str, Path]:
-        if self.scenario == "s2_nodedup_max5":
+        if self.scenario == "s2_careful_max5":
             return {
-                "index": self.data_dir / "faiss_index_s2_nodedup_max5.index",
-                "meta": self.data_dir / "faiss_meta_s2_nodedup_max5.csv",
-                "vectors": self.data_dir / "padded_vectors_s2_nodedup_max5.npy",
-                "slot_means": self.data_dir / "slot_means_s2_nodedup_max5.npy",
+                "index": self.data_dir / "faiss_index_s2_careful_max5.index",
+                "meta": self.data_dir / "faiss_meta_s2_careful_max5.csv",
+                "vectors": self.data_dir / "padded_vectors_s2_careful_max5.npy",
+                "slot_means": self.data_dir / "slot_means_s2_careful_max5.npy",
             }
 
         base = f"{self.scenario}_c{num_clusters}"
@@ -109,7 +108,7 @@ class ColorFaissRetriever:
             end = start + per_color_dim
             full_query[start:end] = slot_means[idx]
 
-        n_candidates = min(max(top_k, 1) * self.candidate_multiplier, index.ntotal)
+        n_candidates = min(top_k * 10, index.ntotal)
         distances, indices = index.search(full_query.reshape(1, -1).astype(np.float32), n_candidates)
         candidate_ids = [v for v in indices[0] if v != -1]
 
@@ -127,7 +126,7 @@ class ColorFaissRetriever:
         rescored.sort(key=lambda x: x[1])
 
         results = []
-        for rank, (vec_id, dist) in enumerate(rescored[:top_k], start=1):
+        for vec_id, dist in rescored:
             if vec_id not in meta_by_id.index:
                 continue
             row = meta_by_id.loc[vec_id]
@@ -139,7 +138,7 @@ class ColorFaissRetriever:
 
             results.append(
                 {
-                    "rank": rank,
+                    "rank": len(results) + 1,
                     "vec_id": int(vec_id),
                     "image_id": int(row.get("image_id", vec_id)),
                     "image_path": str(row.get("image_path", "")),
@@ -148,6 +147,9 @@ class ColorFaissRetriever:
                     "distance": dist,
                 }
             )
+            
+            if len(results) >= top_k:
+                break
 
         return results
 
@@ -155,8 +157,8 @@ class ColorFaissRetriever:
 _color_faiss_retriever: Optional[ColorFaissRetriever] = None
 
 
-def get_color_faiss_retriever(data_dir: str, candidate_multiplier: int) -> ColorFaissRetriever:
+def get_color_faiss_retriever(data_dir: str) -> ColorFaissRetriever:
     global _color_faiss_retriever
     if _color_faiss_retriever is None:
-        _color_faiss_retriever = ColorFaissRetriever(data_dir, candidate_multiplier=candidate_multiplier)
+        _color_faiss_retriever = ColorFaissRetriever(data_dir)
     return _color_faiss_retriever

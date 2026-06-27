@@ -241,7 +241,6 @@ async def get_recommendation_faiss(
 
         retriever = get_color_faiss_retriever(
             settings.DATA_PATH,
-            20,
         )
 
         results = await asyncio.to_thread(
