@@ -126,7 +126,7 @@ def extract_dominant_colors_careful(
     # Sel dengan densitas tinggi menjadi kandidat seed; sel sparse secara
     # alami tidak terpilih karena kalah urutan densitas.
     # (Han et al., 2025 — grid partitioning dalam careful seeding)
-    grid_size = 16.0
+    grid_size = 8.0
     min_dist  = 30.0
     quantized = np.floor(pixels / grid_size) * grid_size
     unique_colors, counts = np.unique(quantized, axis=0, return_counts=True)
