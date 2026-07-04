@@ -1,3 +1,12 @@
+---
+title: GaleriDigital BatikMalang
+emoji: 🖼️
+colorFrom: blue
+colorTo: green
+sdk: docker
+pinned: false
+---
+
 # Batik & Fashion ML API
 
 Machine Learning service terpadu untuk Klasifikasi Batik, Segmentasi Fashion, dan Rekomendasi Batik — dijalankan sebagai **satu service** berbasis Python 3.7 / TF 1.15 / PyTorch 1.12.
