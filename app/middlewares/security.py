@@ -87,6 +87,13 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
         api_key = request.headers.get("X-API-Key")
         expected_api_key = os.getenv("API_KEY", "")
 
+        # Fitur otomatisasi untuk Swagger UI:
+        # Jika request tidak memiliki API Key tapi berasal dari halaman /docs,
+        # kita otomatis gunakan API_KEY dari .env agar testing langsung bisa.
+        referer = request.headers.get("referer", "")
+        if not api_key and "/docs" in referer:
+            api_key = expected_api_key
+
         if not api_key:
             return JSONResponse(
                 status_code=status.HTTP_401_UNAUTHORIZED,

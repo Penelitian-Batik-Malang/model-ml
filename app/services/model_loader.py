@@ -5,6 +5,7 @@ from typing import Dict, Optional
 from app.services.motif_classifier import MotifClassifier
 from app.services.tulis_classifier import TulisClassifier
 from app.services.cbir_engine import CBIREngine
+from app.services.colorizer_engine import colorizer_engine
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +34,7 @@ class ModelLoader:
         self.checkpoints_path: Optional[str] = None
         self.tpu_path: Optional[str] = None
 
-        self.status: Dict[str, bool] = {"motif": False, "tulis": False, "cbir": False}
+        self.status: Dict[str, bool] = {"motif": False, "tulis": False, "cbir": False, "colorizer": False}
         self._initialized = True
         logger.info("ModelLoader initialized")
 
@@ -54,7 +55,7 @@ class ModelLoader:
         """Load all models and supporting data."""
         from app.config.settings import settings
 
-        self.status = {"motif": False, "tulis": False, "cbir": False}
+        self.status = {"motif": False, "tulis": False, "cbir": False, "colorizer": False}
 
         self.model_path = model_path
         self.data_path = data_path
@@ -119,6 +120,12 @@ class ModelLoader:
         )
         self.status["cbir"] = self.cbir_engine.load()
 
+        try:
+            self.status["colorizer"] = colorizer_engine.load()
+        except Exception as e:
+            logger.error("Failed to load colorizer engine: %s", e)
+            self.status["colorizer"] = False
+
         return any(self.status.values())
 
     def is_model_loaded(self) -> bool:
@@ -132,6 +139,9 @@ class ModelLoader:
 
     def is_cbir_loaded(self) -> bool:
         return self.status.get("cbir", False)
+
+    def is_colorizer_loaded(self) -> bool:
+        return self.status.get("colorizer", False)
 
     def get_motif_classifier(self) -> Optional[MotifClassifier]:
         return self.motif_classifier
