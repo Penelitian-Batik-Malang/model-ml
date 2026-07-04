@@ -52,9 +52,41 @@ async def lifespan(app: FastAPI):
 
     recolor_loader = RecolorModelLoader.get_instance()
     try:
+        import os
+        from pathlib import Path
+
+        fe_path = Path(settings.RECOLOR_FE_PATH)
+        rd_path = Path(settings.RECOLOR_RD_PATH)
+
+        # Auto-download recolor models from HF if not present locally
+        if not fe_path.exists() or not rd_path.exists():
+            logger.info("Recolor models not found locally, downloading from galeriBatikMalang/ML_models...")
+            try:
+                from huggingface_hub import hf_hub_download
+                hf_token = os.getenv("HF_TOKEN")
+                fe_path.parent.mkdir(parents=True, exist_ok=True)
+                if not fe_path.exists():
+                    downloaded = hf_hub_download(
+                        repo_id="galeriBatikMalang/ML_models",
+                        filename="FE.state_dict_paling_final.pt",
+                        local_dir=str(fe_path.parent),
+                        token=hf_token,
+                    )
+                    logger.info("Downloaded FE model to: %s", downloaded)
+                if not rd_path.exists():
+                    downloaded = hf_hub_download(
+                        repo_id="galeriBatikMalang/ML_models",
+                        filename="RD.state_dict_paling_final.pt",
+                        local_dir=str(rd_path.parent),
+                        token=hf_token,
+                    )
+                    logger.info("Downloaded RD model to: %s", downloaded)
+            except Exception as dl_err:
+                logger.warning("Failed to download recolor models from HF: %s", dl_err)
+
         recolor_loader.load(
-            fe_path=settings.RECOLOR_FE_PATH,
-            rd_path=settings.RECOLOR_RD_PATH,
+            fe_path=str(fe_path),
+            rd_path=str(rd_path),
             device=settings.RECOLOR_DEVICE,
         )
         logger.info("Recolor models loaded successfully at startup")
