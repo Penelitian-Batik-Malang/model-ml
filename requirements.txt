@@ -39,6 +39,7 @@ scikit-image==0.23.2
 transformers==4.40.2
 diffusers==0.28.0
 huggingface-hub==0.24.7
+deep-translator==1.11.4
 accelerate>=0.26.0
 faiss-cpu==1.8.0
 
