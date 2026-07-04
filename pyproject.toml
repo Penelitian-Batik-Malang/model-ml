@@ -1,0 +1,15 @@
+[tool.ruff]
+# Exclude external libraries and TPU tools from linting
+exclude = [
+    "tpu",
+    ".git",
+    "__pycache__",
+    ".venv",
+    "venv",
+    ".pytest_cache",
+]
+
+[tool.pytest.ini_options]
+# Pytest configuration
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]

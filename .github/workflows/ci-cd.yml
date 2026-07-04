@@ -1,0 +1,51 @@
+name: Deploy model-ml
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    name: Deploy to VPS
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          passphrase: ${{ secrets.VPS_SSH_PASSPHRASE }}
+          port: ${{ secrets.VPS_SSH_PORT }}
+          script: |
+            set -e
+
+            echo "=== [1/6] Navigasi ke direktori proyek ==="
+            cd /var/www/model-ml
+
+            echo "=== [2/6] Pull kode terbaru ==="
+            git pull origin main
+
+            echo "=== [3/6] Tulis file .env dari secret ==="
+            cat > /var/www/model-ml/.env << 'ENVEOF'
+            ${{ secrets.ENV_PROD }}
+            ENVEOF
+
+            echo "=== [4/6] Aktifkan venv dan install/update dependencies ==="
+            source /var/www/model-ml/venv/bin/activate
+            pip install --upgrade pip
+            pip install -r requirements.txt
+            deactivate
+
+            echo "=== [5/6] Restart model-ml service ==="
+            sudo systemctl restart model-ml
+
+            echo "=== [6/6] Verifikasi service berjalan ==="
+            sleep 3
+            sudo systemctl is-active model-ml || (sudo journalctl -u model-ml -n 50 && exit 1)
+
+            echo "✅ Deployment model-ml selesai!"
