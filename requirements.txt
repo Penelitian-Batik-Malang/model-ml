@@ -37,6 +37,8 @@ numpy==1.26.4
 joblib==1.4.2
 scikit-image==0.23.2
 transformers==4.40.2
+diffusers>=0.25.0
+accelerate>=0.26.0
 faiss-cpu==1.8.0
 
 # FIX 1: matplotlib 3.8.2 has a circular import bug on Python 3.12.
