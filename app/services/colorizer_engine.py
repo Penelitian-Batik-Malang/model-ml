@@ -133,13 +133,20 @@ class BatikColorizer:
         z_t = z_gray.clone()
         dt = 1.0 / len(t_sched)
         
-        print(f"  [Colorizer] Menjalankan {len(t_sched)} steps (Rectified Flow Forward)...")
+        print(f"  [Colorizer] Menjalankan {len(t_sched)} steps (Rectified Flow Forward - BATCHED)...")
+        # Batched embeddings: [neg_emb, pos_emb] -> shape [2, 77, 768]
+        encoder_hidden_states_batched = torch.cat([neg_emb, pos_emb], dim=0)
+        
         for i, t_val in enumerate(t_sched):
-            t_tensor = torch.tensor([t_val], dtype=torch.long, device=self.device)
+            t_tensor = torch.tensor([t_val, t_val], dtype=torch.long, device=self.device)
             latent_model_input = torch.cat([z_t, z_gray], dim=1)
+            # Batch input to UNet: double the batch dimension from 1 to 2
+            latent_model_input_batched = torch.cat([latent_model_input, latent_model_input], dim=0)
             
-            pred_pos = self.unet(latent_model_input, t_tensor, encoder_hidden_states=pos_emb).sample
-            pred_neg = self.unet(latent_model_input, t_tensor, encoder_hidden_states=neg_emb).sample
+            # Single forward pass for both positive and negative prompts
+            pred_all = self.unet(latent_model_input_batched, t_tensor, encoder_hidden_states=encoder_hidden_states_batched).sample
+            pred_neg, pred_pos = pred_all.chunk(2, dim=0)
+            
             v_pred = pred_neg + cfg * (pred_pos - pred_neg)
             z_t = z_t + v_pred * dt
                 
