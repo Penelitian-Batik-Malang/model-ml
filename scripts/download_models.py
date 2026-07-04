@@ -2,7 +2,7 @@
 Script ini dijalankan saat container startup untuk mendownload
 folder models/ dan data/ dari HF Model Repo ke dalam container.
 
-Repo: Fadhlu/models_galeridigital-batikmalang
+Repo: galeriBatikMalang/ML_models
 """
 import os
 import sys
@@ -15,7 +15,7 @@ def download_models():
         print("[download_models] ERROR: huggingface_hub tidak terinstall!")
         sys.exit(1)
 
-    repo_id = "Fadhlu/models_galeridigital-batikmalang"
+    repo_id = "galeriBatikMalang/ML_models"
     token = os.getenv("HF_TOKEN")
     app_dir = Path(__file__).resolve().parent.parent  # root app
 
