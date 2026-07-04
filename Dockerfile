@@ -36,5 +36,5 @@ COPY --chown=user:user . $HOME/app/
 ENV PORT=7860
 EXPOSE 7860
 
-# Start the application
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7860"]
+# Start: download models terlebih dahulu lalu jalankan server
+CMD ["sh", "-c", "python scripts/download_models.py && uvicorn main:app --host 0.0.0.0 --port 7860"]
