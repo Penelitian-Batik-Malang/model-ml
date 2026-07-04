@@ -109,6 +109,19 @@ class Settings(BaseSettings):
     # Timeout settings
     INFERENCE_TIMEOUT_SECONDS: int = 30
     
+    # Recolor model settings
+    RECOLOR_FE_PATH: str = os.getenv(
+        "RECOLOR_FE_PATH",
+        str(REPO_ROOT / "models" / "FE.state_dict_paling_final.pt"),
+    )
+    RECOLOR_RD_PATH: str = os.getenv(
+        "RECOLOR_RD_PATH",
+        str(REPO_ROOT / "models" / "RD.state_dict_paling_final.pt"),
+    )
+    RECOLOR_DEVICE: str = os.getenv("RECOLOR_DEVICE", "cpu")
+    RECOLOR_MAX_IMAGE_WIDTH: int = int(os.getenv("RECOLOR_MAX_IMAGE_WIDTH", 1280))
+    RECOLOR_MAX_IMAGE_HEIGHT: int = int(os.getenv("RECOLOR_MAX_IMAGE_HEIGHT", 1280))
+
     # Rate limiting
     RATE_LIMIT_ENABLED: bool = True
     RATE_LIMIT_CLASSIFY: str = os.getenv("RATE_LIMIT_CLASSIFY", "10/minute")

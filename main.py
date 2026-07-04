@@ -14,6 +14,7 @@ from app.middlewares.security import APIKeyMiddleware, SecurityHeadersMiddleware
 from app.routes.api import api_router
 from app.services.fashion_cbir_store import init_fashion_cbir_db
 from app.services.model_loader import get_model_loader
+from app.services.core.model_loader import ModelLoader as RecolorModelLoader
 from app.utils.response import ResponseBuilder
 from app.utils.session_handler import cleanup_old_sessions
 
@@ -48,6 +49,17 @@ async def lifespan(app: FastAPI):
         logger.info("Model loaded successfully at startup")
     else:
         logger.warning("Model failed to load at startup")
+
+    recolor_loader = RecolorModelLoader.get_instance()
+    try:
+        recolor_loader.load(
+            fe_path=settings.RECOLOR_FE_PATH,
+            rd_path=settings.RECOLOR_RD_PATH,
+            device=settings.RECOLOR_DEVICE,
+        )
+        logger.info("Recolor models loaded successfully at startup")
+    except Exception as e:
+        logger.warning("Recolor models failed to load: %s", e)
 
     yield
 
