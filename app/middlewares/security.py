@@ -37,7 +37,7 @@ async def verify_api_key(request: Request, skip_paths: list = None) -> bool:
         True jika valid, raises HTTPException jika invalid
     """
     if skip_paths is None:
-        skip_paths = ["/api/health", "/docs", "/openapi.json", "/redoc"]
+        skip_paths = ["/", "/api/health", "/docs", "/openapi.json", "/redoc"]
     
     # Skip validation untuk health check dan dokumentasi
     if request.url.path in skip_paths:
@@ -75,7 +75,7 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
     
     def __init__(self, app, skip_paths: list = None):
         super().__init__(app)
-        self.skip_paths = skip_paths or ["/api/health", "/docs", "/openapi.json", "/redoc"]
+        self.skip_paths = skip_paths or ["/", "/api/health", "/docs", "/openapi.json", "/redoc"]
 
     async def dispatch(self, request: Request, call_next):
         path = (request.scope.get("path") or request.url.path or "").rstrip("/") or "/"
