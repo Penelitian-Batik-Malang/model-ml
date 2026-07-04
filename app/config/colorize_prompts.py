@@ -4,7 +4,7 @@
 import os
 from pathlib import Path
 
-DEFAULT_STEPS = 50
+DEFAULT_STEPS = 20
 DEFAULT_CFG_SCALE = 12.0
 DEFAULT_COLOR_SCALE = 0.8
 DEFAULT_SEED = 42
