@@ -5,8 +5,9 @@ import logging
 from typing import Any, Dict, Optional, Tuple
 
 from fastapi import APIRouter, File, HTTPException, Request, UploadFile, status
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from PIL import Image
+import os
 
 from app.config.rate_limit import CBIR_LIMIT, limiter
 from app.config.settings import settings

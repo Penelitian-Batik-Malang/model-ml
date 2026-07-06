@@ -17,6 +17,11 @@ from app.services.model_loader import get_model_loader
 from app.services.core.model_loader import ModelLoader as RecolorModelLoader
 from app.utils.response import ResponseBuilder
 from app.utils.session_handler import cleanup_old_sessions
+from app.models.multimodal import MultimodalRetrievalModel
+from app.services.gallery import build_gallery_if_missing
+from app.services.multimodal_state import set_multimodal_state
+import torch
+from transformers import AutoTokenizer
 
 logging.basicConfig(
     level=settings.LOG_LEVEL,
@@ -92,6 +97,39 @@ async def lifespan(app: FastAPI):
         logger.info("Recolor models loaded successfully at startup")
     except Exception as e:
         logger.warning("Recolor models failed to load: %s", e)
+
+    try:
+        # Multimodal Init
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        multimodal_model = MultimodalRetrievalModel()
+        model_path = os.path.join(settings.MODEL_PATH, settings.MULTIMODAL_MODEL_FILE)
+        
+        if os.path.exists(model_path):
+            checkpoint = torch.load(model_path, map_location=device, weights_only=True)
+            if "model_state_dict" in checkpoint:
+                multimodal_model.load_state_dict(checkpoint["model_state_dict"])
+            else:
+                multimodal_model.load_state_dict(checkpoint)
+            multimodal_model.to(device)
+            multimodal_model.eval()
+            
+            tokenizer = AutoTokenizer.from_pretrained("indobenchmark/indobert-base-p1")
+            
+            gallery_embeddings, gallery_paths, gallery_categories = build_gallery_if_missing(multimodal_model, device)
+            
+            set_multimodal_state(
+                model=multimodal_model,
+                tokenizer=tokenizer,
+                device=device,
+                gallery_embeddings=gallery_embeddings,
+                gallery_paths=gallery_paths,
+                gallery_categories=gallery_categories
+            )
+            logger.info("Multimodal model and gallery loaded successfully.")
+        else:
+            logger.warning("Multimodal model file not found at %s. Multimodal search will be unavailable.", model_path)
+    except Exception as e:
+        logger.error("Failed to load multimodal model: %s", e, exc_info=True)
 
     yield
 

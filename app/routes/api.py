@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.controllers import health, classify, cbir, tulis, color_faiss, fashion, search, detection, colorizer, recolor
+from app.controllers import health, classify, cbir, tulis, color_faiss, fashion, search, detection, colorizer, recolor, retrieval
 
 # Create main API router
 api_router = APIRouter(prefix="/api")
@@ -15,3 +15,4 @@ api_router.include_router(search.router, tags=["Search"])
 api_router.include_router(detection.router, tags=["Detection"])
 api_router.include_router(colorizer.router, tags=["Colorizer"])
 api_router.include_router(recolor.router, tags=["Recolor"])
+api_router.include_router(retrieval.router, tags=["Retrieval"])

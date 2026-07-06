@@ -85,6 +85,7 @@ class Settings(BaseSettings):
     S3_BUCKET_NAME: str = os.getenv("AWS_BUCKET_NAME", "")
     S3_BUCKET_NAME_CBIR: str = os.getenv("AWS_BUCKET_NAME_CBIR", "")
     S3_BUCKET_NAME_COLOR_FAISS: str = os.getenv("AWS_BUCKET_NAME_COLOR_FAISS", "")
+    AWS_BUCKET_SIGNATURE_DRIVE: str = os.getenv("AWS_BUCKET_SIGNATURE_DRIVE", "")
     S3_BATIK_FASHION_ROOT_URL: str = os.getenv(
         "S3_BATIK_FASHION_ROOT_URL",
         "https://is3.cloudhost.id/color-dominant-batik",
@@ -93,6 +94,16 @@ class Settings(BaseSettings):
     S3_REGION: str = os.getenv("AWS_REGION", "")
     S3_DATASET_BASE_PATH: str = os.getenv("S3_DATASET_BASE_PATH", "")
     S3_PRESIGN_EXPIRES: int = int(os.getenv("S3_PRESIGN_EXPIRES", 3600))
+
+    # Multimodal Retrieval Settings
+    MULTIMODAL_MODEL_FILE: str = os.getenv("MULTIMODAL_MODEL_FILE", "Modelmultimodal.pt")
+    NPZ_PATH: str = os.getenv("NPZ_PATH", str(REPO_ROOT / "data" / "gallery.npz"))
+    CSV_PATH: str = os.getenv("CSV_PATH", str(REPO_ROOT / "data" / "analisis_checkpoint_caption_skripsi.csv"))
+    IMG_SIZE: int = 224
+    BATCH_SIZE: int = 32
+    MAX_TEXT_LEN: int = 32
+    IMAGE_ROOT: str = os.getenv("IMAGE_ROOT", "Data_Untuk_Clustering")
+
     
     # Request settings
     MAX_IMAGE_SIZE_MB: int = int(os.getenv("MAX_IMAGE_SIZE_MB", 20))
