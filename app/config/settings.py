@@ -85,12 +85,12 @@ class Settings(BaseSettings):
     S3_BUCKET_NAME: str = os.getenv("AWS_BUCKET_NAME", "")
     S3_BUCKET_NAME_CBIR: str = os.getenv("AWS_BUCKET_NAME_CBIR", "")
     S3_BUCKET_NAME_COLOR_FAISS: str = os.getenv("AWS_BUCKET_NAME_COLOR_FAISS", "")
-    AWS_BUCKET_SIGNATURE_DRIVE: str = os.getenv("AWS_BUCKET_SIGNATURE_DRIVE", "")
+    AWS_BUCKET_SIGNATURE_DRIVE: str = os.getenv("AWS_BUCKET_SIGNATURE_DRIVE", "batik-signature-gdrive")
     S3_BATIK_FASHION_ROOT_URL: str = os.getenv(
         "S3_BATIK_FASHION_ROOT_URL",
         "https://is3.cloudhost.id/color-dominant-batik",
     )
-    S3_ENDPOINT_URL: str = os.getenv("AWS_ENDPOINT_URL", "")
+    S3_ENDPOINT_URL: str = os.getenv("AWS_ENDPOINT_URL", "https://is3.cloudhost.id/")
     S3_REGION: str = os.getenv("AWS_REGION", "")
     S3_DATASET_BASE_PATH: str = os.getenv("S3_DATASET_BASE_PATH", "")
     S3_PRESIGN_EXPIRES: int = int(os.getenv("S3_PRESIGN_EXPIRES", 3600))
