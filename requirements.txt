@@ -42,6 +42,7 @@ huggingface-hub==0.24.7
 deep-translator==1.11.4
 accelerate>=0.26.0
 faiss-cpu==1.8.0
+timm>=0.9.16
 
 # FIX 1: matplotlib 3.8.2 has a circular import bug on Python 3.12.
 #         Upgrade to 3.9.x which resolves the '_version' ImportError.
