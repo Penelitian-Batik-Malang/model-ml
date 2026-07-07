@@ -150,6 +150,9 @@ def find_optimal_k_elbow(
                 intra_cluster_de.append(np.mean(de))
 
             avg_deltaE_per_k.append(np.mean(intra_cluster_de) if intra_cluster_de else np.nan)
+    
+    logging.debug(f"Evaluated ks: {ks}")
+    logging.debug(f"Average deltaE per k: {avg_deltaE_per_k}")
 
     if _KNEED_AVAILABLE:
         kl = KneeLocator(ks, avg_deltaE_per_k, curve="convex", direction="decreasing")
