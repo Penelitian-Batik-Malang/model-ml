@@ -1,3 +1,4 @@
+import logging
 import os
 
 import torch
@@ -5,24 +6,7 @@ import torch
 from app.config.settings import settings
 from app.services.s3 import get_s3_presigned_url
 
-
-# Direct public S3 base URL untuk bucket batik-signature-gdrive
-# Format: {S3_ENDPOINT_URL}/{bucket}/{folder_category}/{filename}
-_S3_ENDPOINT = settings.S3_ENDPOINT_URL.rstrip('/')
-_S3_BUCKET   = settings.AWS_BUCKET_SIGNATURE_DRIVE
-
-
-def _build_s3_direct_url(category: str, filename: str) -> str:
-    """
-    Bangun URL S3 langsung (public) tanpa presigned.
-    Path di bucket: {folder_category}/{filename}
-    """
-    if not _S3_ENDPOINT or not _S3_BUCKET:
-        return ""
-    # URL-encode spasi di nama file/folder agar bisa diakses browser
-    safe_cat  = category.replace(" ", "%20")
-    safe_file = filename.replace(" ", "%20")
-    return f"{_S3_ENDPOINT}/{_S3_BUCKET}/{safe_cat}/{safe_file}"
+logger = logging.getLogger(__name__)
 
 
 def encode_query(query: str, model, tokenizer, device) -> torch.Tensor:
@@ -65,16 +49,20 @@ def search_top_k(query: str, top_k: int, state: dict, base_url: str, image_endpo
         category = categories[idx]
         filename = os.path.basename(paths[idx])
 
-        # 1. Coba bangun direct public S3 URL (category/filename)
-        image_url = _build_s3_direct_url(category, filename)
+        # Gunakan presigned URL — sama seperti pola color_faiss.py.
+        # S3 key: {folder_category}/{filename}
+        # Bucket: settings.AWS_BUCKET_SIGNATURE_DRIVE (batik-signature-gdrive)
+        # Presigned URL membawa signature auth sehingga aman untuk bucket privat
+        # dan tidak akan menghasilkan 403 seperti direct public URL.
+        s3_key    = f"{category}/{filename}"
+        image_url = get_s3_presigned_url(s3_key)
 
-        # 2. Fallback: presigned URL (jika bucket privat)
+        # Fallback last resort: endpoint raw-image lokal
+        # (hanya aktif jika S3 tidak dikonfigurasi atau credentials tidak valid)
         if not image_url:
-            s3_key    = f"{category}/{filename}"
-            image_url = get_s3_presigned_url(s3_key)
-
-        # 3. Last resort: endpoint raw-image lokal
-        if not image_url:
+            logger.warning(
+                "Presigned URL gagal untuk %s, fallback ke raw-image endpoint", s3_key
+            )
             image_url = f"{base_url}{image_endpoint_prefix}/{idx}"
 
         results.append({
@@ -86,4 +74,4 @@ def search_top_k(query: str, top_k: int, state: dict, base_url: str, image_endpo
             "image_url"    : image_url,
         })
 
-    return k_eff, results
+    return k_eff, results
