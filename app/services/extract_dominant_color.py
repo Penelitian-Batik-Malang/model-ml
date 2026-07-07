@@ -50,7 +50,7 @@ CHROMA_PERCENTILE     = 50.0
 ELBOW_K_MIN           = 1
 ELBOW_K_MAX           = 50
 ELBOW_N_INIT          = 5
-ELBOW_MAX_PIXELS      = 5000
+ELBOW_MAX_PIXELS      = 2500
 _LABELER = ColorPaletteMultiLabel()
 
 # ── Backward-compat alias ────────────────────────────────────────────────────
@@ -140,20 +140,15 @@ def find_optimal_k_elbow(
             centers    = km.cluster_centers_
 
             intra_cluster_de = []
-            # print(f"Evaluating k={k}...")
             for i in range(k):
                 cluster_points = pixels_for_fit[labels_km == i]
                 if len(cluster_points) == 0:
                     continue
                 center_rep = np.repeat(centers[i][None, :], len(cluster_points), axis=0)
                 de = deltaE_ciede2000(cluster_points, center_rep)
-                # print(f"Cluster {i} (K={k}): mean deltaE = {np.mean(de):.4f}, count = {len(cluster_points)}")
                 intra_cluster_de.append(np.mean(de))
 
             avg_deltaE_per_k.append(np.mean(intra_cluster_de) if intra_cluster_de else np.nan)
-    
-    # print(f"Average deltaE per k: {avg_deltaE_per_k}")
-    # print(f"Evaluated ks: {ks}")
 
     if _KNEED_AVAILABLE:
         kl = KneeLocator(ks, avg_deltaE_per_k, curve="convex", direction="decreasing")
