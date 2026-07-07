@@ -249,7 +249,7 @@ async def get_recommendation_faiss(
             result,
             selected_slots,
             top_k,
-            n_candidates_multiplier=150,
+            n_candidates_multiplier=10,
         )
 
         storage = get_s3_storage()
