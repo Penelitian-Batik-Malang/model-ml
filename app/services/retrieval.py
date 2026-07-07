@@ -48,13 +48,20 @@ def search_top_k(query: str, top_k: int, state: dict, base_url: str, image_endpo
     for rank, idx in enumerate(topk_indices):
         category = categories[idx]
         filename = os.path.basename(paths[idx])
+        
+        # S3 case-sensitive: pastikan ekstensi lowercase (.JPG -> .jpg) karena 
+        # file di bucket S3 menggunakan ekstensi lowercase.
+        filename_s3 = filename
+        if '.' in filename_s3:
+            base_name, ext = filename_s3.rsplit('.', 1)
+            filename_s3 = f"{base_name}.{ext.lower()}"
 
         # Gunakan presigned URL — sama seperti pola color_faiss.py.
-        # S3 key: {folder_category}/{filename}
+        # S3 key: {folder_category}/{filename_s3}
         # Bucket: settings.AWS_BUCKET_SIGNATURE_DRIVE (batik-signature-gdrive)
         # Presigned URL membawa signature auth sehingga aman untuk bucket privat
         # dan tidak akan menghasilkan 403 seperti direct public URL.
-        s3_key    = f"{category}/{filename}"
+        s3_key    = f"{category}/{filename_s3}"
         image_url = get_s3_presigned_url(s3_key)
 
         # Fallback last resort: endpoint raw-image lokal
