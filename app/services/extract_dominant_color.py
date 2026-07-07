@@ -19,6 +19,7 @@ Konstanta:
   FEATURE_SLOT = 3   (L, a, b — Skenario 2)
 """
 
+import logging
 import warnings
 import cv2
 import numpy as np
@@ -145,6 +146,7 @@ def find_optimal_k_elbow(
                     continue
                 center_rep = np.repeat(centers[i][None, :], len(cluster_points), axis=0)
                 de = deltaE_ciede2000(cluster_points, center_rep)
+                logging.debug(f"K={k}, cluster {i}: mean deltaE={np.mean(de):.4f}, count={len(de)}")
                 intra_cluster_de.append(np.mean(de))
 
             avg_deltaE_per_k.append(np.mean(intra_cluster_de) if intra_cluster_de else np.nan)
