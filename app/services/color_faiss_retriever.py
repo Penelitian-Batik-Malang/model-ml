@@ -54,15 +54,18 @@ def diversify_topk(
     -------
     list of (vec_id, distance), panjang <= k
     """
-    selected     = []
+    selected = []
     used_classes = set()
-    leftover     = []
+    leftover = []
 
     for vec_id, dist in rescored:
         cls = vec_id_to_class.get(vec_id)
-        if cls not in used_classes:
+        cls_key = f"__missing__:{vec_id}"
+        if cls is not None:
+            cls_key = str(cls).strip().lower()
+        if cls_key not in used_classes:
             selected.append((vec_id, dist))
-            used_classes.add(cls)
+            used_classes.add(cls_key)
         else:
             leftover.append((vec_id, dist))
 
@@ -73,6 +76,11 @@ def diversify_topk(
         needed = k - len(selected)
         selected.extend(leftover[:needed])
 
+    logger.info(
+        "Diversified retrieval: selected=%d, candidates=%d",
+        len(selected),
+        len(rescored),
+    )
     return selected
 
 
