@@ -163,7 +163,7 @@ async def color_palette_faiss(
 async def get_recommendation_faiss(
     request: Request,
     file: Annotated[UploadFile, File(...)],
-    top_k: Annotated[int, Form()] = 5,
+    top_k: Annotated[int, Form()] = 15,
     selected_colors: Annotated[str, Form()] = "",
 ):
     try:
@@ -249,6 +249,7 @@ async def get_recommendation_faiss(
             result,
             selected_slots,
             top_k,
+            n_candidates_multiplier=10,
         )
 
         storage = get_s3_storage()
