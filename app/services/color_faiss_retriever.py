@@ -153,7 +153,7 @@ class ColorFaissRetriever:
         result: dict,
         selected_slots: Optional[List[int]],
         top_k: int,
-        n_candidates_multiplier: int = 150,
+        n_candidates_multiplier: int = 10,
     ) -> List[dict]:
         """
         Retrieval FAISS dengan image-specific fill + rescoring + diversifikasi.
