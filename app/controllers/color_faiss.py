@@ -12,7 +12,7 @@ from fastapi.responses import JSONResponse
 from app.config.rate_limit import CBIR_LIMIT, CLASSIFY_LIMIT, limiter
 from app.config.settings import settings
 from app.services.color_faiss_retriever import get_color_faiss_retriever
-from app.services.extract_dominant_color import ExtractDominantColor
+from app.services.extract_dominant_color import ExtractDominantColor, LARGEST_K
 from app.services.s3_storage import get_s3_storage
 from app.utils.image_validator import ImageValidator
 from app.utils.resize import Resize
@@ -21,7 +21,7 @@ from app.utils.response import ResponseBuilder
 logger = logging.getLogger(__name__)
 router = APIRouter()
 INVALID_REQUEST_MESSAGE = "Invalid request"
-DEFAULT_NUM_CLUSTER = ExtractDominantColor.MAX_CLUSTERS
+DEFAULT_NUM_CLUSTER = LARGEST_K   # = 14 (sesuai FAISS artifacts)
 
 
 def _parse_selected_colors(value: str, num_cluster: int = DEFAULT_NUM_CLUSTER) -> Optional[List[int]]:
@@ -99,10 +99,11 @@ async def color_palette_faiss(
             )
 
         image_bgr = _load_image(file_content)
-        resized = Resize.proportional_resize(image_bgr, 384)
-        result = ExtractDominantColor.extract_dominant_colors_careful(
+        resized   = Resize.proportional_resize(image_bgr, 384)
+        result    = ExtractDominantColor.extract_dominant_colors_careful(
             resized,
             max_clusters=DEFAULT_NUM_CLUSTER,
+            find_elbow=True,
         )
         if result is None:
             return JSONResponse(
@@ -211,13 +212,14 @@ async def get_recommendation_faiss(
                 ).model_dump(),
             )
 
-        selected_slots = _parse_selected_colors(selected_colors)
+        selected_slots = _parse_selected_colors(selected_colors, num_cluster=DEFAULT_NUM_CLUSTER)
 
         image_bgr = _load_image(file_content)
-        resized = Resize.proportional_resize(image_bgr, 384)
-        result = ExtractDominantColor.extract_dominant_colors_careful(
+        resized   = Resize.proportional_resize(image_bgr, 384)
+        result    = ExtractDominantColor.extract_dominant_colors_careful(
             resized,
             max_clusters=DEFAULT_NUM_CLUSTER,
+            find_elbow=True,
         )
         if result is None:
             return JSONResponse(
@@ -229,24 +231,22 @@ async def get_recommendation_faiss(
                 ).model_dump(),
             )
 
-        k_opt = result["k_optimal"]
-        fvec_actual_4d = result["feature_vector"]
+        # Pastikan hasil ekstraksi dapat diproses FAISS
+        if "full_query_vector" in result:
+            result["full_query_vector"] = np.array(
+                result["full_query_vector"], dtype=np.float32
+            ).reshape(-1)
+        if "feature_vector" in result:
+            result["feature_vector"] = np.array(
+                result["feature_vector"], dtype=np.float32
+            ).reshape(-1)
 
-        # Filter: Buang fitur 'P' dari query vector (Ambil L, a, b saja)
-        fvec_actual_3d = []
-        for c_idx in range(k_opt):
-            start_4d = c_idx * 4
-            fvec_actual_3d.extend(fvec_actual_4d[start_4d : start_4d + 3])
-        feature_vector = np.array(fvec_actual_3d, dtype=np.float32)
-
-        retriever = get_color_faiss_retriever(
-            settings.DATA_PATH,
-        )
+        # Kirimkan result dict lengkap ke retriever (berisi full_query_vector)
+        retriever = get_color_faiss_retriever(settings.DATA_PATH)
 
         results = await asyncio.to_thread(
             retriever.search,
-            feature_vector,
-            DEFAULT_NUM_CLUSTER,
+            result,
             selected_slots,
             top_k,
         )
