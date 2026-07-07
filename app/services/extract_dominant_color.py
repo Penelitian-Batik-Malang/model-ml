@@ -140,20 +140,20 @@ def find_optimal_k_elbow(
             centers    = km.cluster_centers_
 
             intra_cluster_de = []
-            print(f"Evaluating k={k}...")
+            # print(f"Evaluating k={k}...")
             for i in range(k):
                 cluster_points = pixels_for_fit[labels_km == i]
                 if len(cluster_points) == 0:
                     continue
                 center_rep = np.repeat(centers[i][None, :], len(cluster_points), axis=0)
                 de = deltaE_ciede2000(cluster_points, center_rep)
-                print(f"Cluster {i} (K={k}): mean deltaE = {np.mean(de):.4f}, count = {len(cluster_points)}")
+                # print(f"Cluster {i} (K={k}): mean deltaE = {np.mean(de):.4f}, count = {len(cluster_points)}")
                 intra_cluster_de.append(np.mean(de))
 
             avg_deltaE_per_k.append(np.mean(intra_cluster_de) if intra_cluster_de else np.nan)
     
-    print(f"Average deltaE per k: {avg_deltaE_per_k}")
-    print(f"Evaluated ks: {ks}")
+    # print(f"Average deltaE per k: {avg_deltaE_per_k}")
+    # print(f"Evaluated ks: {ks}")
 
     if _KNEED_AVAILABLE:
         kl = KneeLocator(ks, avg_deltaE_per_k, curve="convex", direction="decreasing")
@@ -534,7 +534,7 @@ def extract_dominant_colors_careful(
         k_elbow   = find_optimal_k_elbow(
             pixels_std_lab,
             k_min=ELBOW_K_MIN,
-            k_max=min(ELBOW_K_MAX, _k_target),
+            k_max=ELBOW_K_MAX,
             max_pixels_for_fit=ELBOW_MAX_PIXELS,
         )
         k_optimal = min(k_elbow, _k_target)
