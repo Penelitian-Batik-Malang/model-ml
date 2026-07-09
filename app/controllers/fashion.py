@@ -19,6 +19,7 @@ from app.config.settings import settings
 from app.services.fashion_blending_engine import (
     load_image_rgb,
     multiply_blend,
+    linear_burn_blend,
     resize_mask_to_image,
     save_image_from_rgb,
 )
@@ -257,6 +258,7 @@ async def blend_manual(
     session_id: str = Form(...),
     part: str = Form(...),
     instance_index: int = Form(0),
+    blending_mode: str = Form("multiply"),
     batik: UploadFile = File(...),
 ) -> Dict[str, Any]:
     if not session_exists(session_id):
@@ -310,7 +312,11 @@ async def blend_manual(
     mask_bool = selected_mask > 0
     current_rgb[mask_bool] = fashion_rgb[mask_bool]
 
-    blended_rgb = multiply_blend(selected_mask, current_rgb, batik_rgb)
+    if blending_mode == "linear_burn":
+        blended_rgb = linear_burn_blend(selected_mask, current_rgb, batik_rgb)
+    else:
+        blended_rgb = multiply_blend(selected_mask, current_rgb, batik_rgb)
+        
     save_image_from_rgb(blended_rgb, current_path)
     add_blended_part(session_id, part, instance_index)
 
@@ -342,6 +348,7 @@ async def blend_from_cbir(
     session_id: str = Form(...),
     part: str = Form(...),
     instance_index: int = Form(0),
+    blending_mode: str = Form("multiply"),
     batik_filename: str = Form(...),
 ) -> Dict[str, Any]:
     if not session_exists(session_id):
@@ -393,7 +400,11 @@ async def blend_from_cbir(
     mask_bool = selected_mask > 0
     current_rgb[mask_bool] = fashion_rgb[mask_bool]
 
-    blended_rgb = multiply_blend(selected_mask, current_rgb, batik_rgb)
+    if blending_mode == "linear_burn":
+        blended_rgb = linear_burn_blend(selected_mask, current_rgb, batik_rgb)
+    else:
+        blended_rgb = multiply_blend(selected_mask, current_rgb, batik_rgb)
+
     save_image_from_rgb(blended_rgb, current_path)
     add_blended_part(session_id, part, instance_index)
 

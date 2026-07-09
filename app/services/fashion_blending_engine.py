@@ -58,3 +58,40 @@ def multiply_blend(mask: np.ndarray, fashion_rgb: np.ndarray, batik_rgb: np.ndar
     roi_result[mask_crop == 1] = batik_final[mask_crop == 1]
     result[y_min : y_max + 1, x_min : x_max + 1] = roi_result
     return result
+
+
+def linear_burn_blend(mask: np.ndarray, fashion_rgb: np.ndarray, batik_rgb: np.ndarray) -> np.ndarray:
+    if mask.dtype != np.uint8:
+        mask = (mask > 0).astype(np.uint8)
+    mask_bool = mask > 0
+    if not mask_bool.any():
+        return fashion_rgb.copy()
+
+    y_indices, x_indices = np.where(mask_bool)
+    y_min, y_max = y_indices.min(), y_indices.max()
+    x_min, x_max = x_indices.min(), x_indices.max()
+
+    roi_fashion = fashion_rgb[y_min : y_max + 1, x_min : x_max + 1].copy()
+    mask_crop = mask_bool[y_min : y_max + 1, x_min : x_max + 1].astype(np.uint8)
+    bbox_h, bbox_w = mask_crop.shape
+
+    # Resize batik
+    batik_fitted = cv2.resize(batik_rgb, (bbox_w, bbox_h), interpolation=cv2.INTER_LANCZOS4)
+
+    fashion_gray_crop = cv2.cvtColor(roi_fashion, cv2.COLOR_RGB2GRAY)
+    rata_pencahayaan = np.mean(fashion_gray_crop[mask_crop == 1])
+
+    shading_offset = fashion_gray_crop.astype(np.float32) - rata_pencahayaan
+
+    batik_float = batik_fitted.astype(np.float32)
+    for i in range(3):
+        batik_float[:, :, i] += shading_offset
+
+    batik_final = np.clip(batik_float, 0, 255).astype(np.uint8)
+
+    result = fashion_rgb.copy()
+    roi_result = result[y_min : y_max + 1, x_min : x_max + 1]
+    roi_result[mask_crop == 1] = batik_final[mask_crop == 1]
+    result[y_min : y_max + 1, x_min : x_max + 1] = roi_result
+
+    return result
