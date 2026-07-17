@@ -19,7 +19,7 @@ START_TIME = time.time()
     status_code=status.HTTP_200_OK,
     tags=["Health"],
     summary="Health check endpoint",
-    description="Check service health dan status model loading. Tidak memerlukan API Key.",
+    description="Check service health, status model loading, dan RAM usage. Tidak memerlukan API Key.",
 )
 @limiter.limit(HEALTH_LIMIT)
 async def health_check(request: Request):
@@ -30,6 +30,7 @@ async def health_check(request: Request):
     - status: 200 jika service healthy
     - model_loaded: true jika model sudah di-load
     - uptime: uptime service dalam detik
+    - ram: RAM usage info (penting untuk monitoring HF Spaces 16GB)
     
     Catatan:
     - Endpoint ini TIDAK memerlukan API Key (skip validation)
@@ -41,6 +42,20 @@ async def health_check(request: Request):
         model_exists = model_loader.check_model_exists(settings.MODEL_PATH)
         uptime = time.time() - START_TIME
         
+        # ── RAM usage monitoring (penting untuk HF Spaces 16 GB) ──
+        ram_info = {}
+        try:
+            import psutil
+            mem = psutil.virtual_memory()
+            ram_info = {
+                "total_gb": round(mem.total / (1024 ** 3), 2),
+                "used_gb": round(mem.used / (1024 ** 3), 2),
+                "available_gb": round(mem.available / (1024 ** 3), 2),
+                "percent_used": mem.percent,
+            }
+        except ImportError:
+            ram_info = {"error": "psutil tidak terinstall"}
+        
         health_data = {
             "status": "healthy",
             "is_model_loaded": is_model_loaded,
@@ -48,11 +63,14 @@ async def health_check(request: Request):
                 "motif": model_loader.is_motif_loaded(),
                 "tulis": model_loader.is_tulis_loaded(),
                 "cbir": model_loader.is_cbir_loaded(),
+                "colorizer": model_loader.is_colorizer_loaded(),
+                "colorizer_note": "lazy-loaded on first /colorizer/colorize request",
             },
             "model_exists": model_exists,
             "uptime": round(uptime, 2),
             "service": settings.APP_NAME,
             "version": settings.APP_VERSION,
+            "ram": ram_info,
         }
         
         if not is_model_loaded:

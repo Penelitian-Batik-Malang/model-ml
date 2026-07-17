@@ -17,11 +17,7 @@ from app.services.model_loader import get_model_loader
 from app.services.core.model_loader import ModelLoader as RecolorModelLoader
 from app.utils.response import ResponseBuilder
 from app.utils.session_handler import cleanup_old_sessions
-from app.models.multimodal import MultimodalRetrievalModel
-from app.services.gallery import build_gallery_if_missing
-from app.services.multimodal_state import set_multimodal_state
 import torch
-from transformers import AutoTokenizer
 
 logging.basicConfig(
     level=settings.LOG_LEVEL,
@@ -33,17 +29,29 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    import os
+    from pathlib import Path
+
     logger.info("Starting %s v%s", settings.APP_NAME, settings.APP_VERSION)
     logger.info("Debug mode: %s", settings.DEBUG)
     logger.info("Model path: %s", settings.MODEL_PATH)
     logger.info("Data path: %s", settings.DATA_PATH)
     logger.info("Checkpoints path: %s", settings.CHECKPOINTS_PATH)
 
+    # ── Optimasi HF Spaces CPU: set thread count sesuai core tersedia ──
+    cpu_count = int(os.getenv("OMP_NUM_THREADS", str(os.cpu_count() or 2)))
+    torch.set_num_threads(cpu_count)
+    torch.set_num_interop_threads(max(1, cpu_count // 2))
+    logger.info("PyTorch CPU threads: %d (interop: %d)", cpu_count, max(1, cpu_count // 2))
+
     cleanup_old_sessions(max_age_hours=2)
     init_fashion_cbir_db()
 
+    # ── FASE 1: Load model-model RINGAN saja di startup (~2 GB) ──
+    # Colorizer (~8 GB) dan Multimodal (~4 GB) TIDAK diload di sini.
+    # Keduanya akan diload secara on-demand saat endpoint pertama kali dipanggil.
     model_loader = get_model_loader()
-    is_loaded = model_loader.load_model(
+    is_loaded = model_loader.load_lightweight_models(
         settings.MODEL_PATH,
         settings.DATA_PATH,
         settings.CHECKPOINTS_PATH,
@@ -51,15 +59,13 @@ async def lifespan(app: FastAPI):
     )
 
     if is_loaded:
-        logger.info("Model loaded successfully at startup")
+        logger.info("Lightweight models loaded successfully at startup")
     else:
-        logger.warning("Model failed to load at startup")
+        logger.warning("Some lightweight models failed to load at startup")
 
+    # ── Recolor models (ringan, ~27 MB) ──
     recolor_loader = RecolorModelLoader.get_instance()
     try:
-        import os
-        from pathlib import Path
-
         fe_path = Path(settings.RECOLOR_FE_PATH)
         rd_path = Path(settings.RECOLOR_RD_PATH)
 
@@ -98,38 +104,13 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning("Recolor models failed to load: %s", e)
 
-    try:
-        # Multimodal Init
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        multimodal_model = MultimodalRetrievalModel()
-        model_path = os.path.join(settings.MODEL_PATH, settings.MULTIMODAL_MODEL_FILE)
-        
-        if os.path.exists(model_path):
-            checkpoint = torch.load(model_path, map_location=device, weights_only=True)
-            if "model_state_dict" in checkpoint:
-                multimodal_model.load_state_dict(checkpoint["model_state_dict"])
-            else:
-                multimodal_model.load_state_dict(checkpoint)
-            multimodal_model.to(device)
-            multimodal_model.eval()
-            
-            tokenizer = AutoTokenizer.from_pretrained("indobenchmark/indobert-base-p1")
-            
-            gallery_embeddings, gallery_paths, gallery_categories = build_gallery_if_missing(multimodal_model, device)
-            
-            set_multimodal_state(
-                model=multimodal_model,
-                tokenizer=tokenizer,
-                device=device,
-                gallery_embeddings=gallery_embeddings,
-                gallery_paths=gallery_paths,
-                gallery_categories=gallery_categories
-            )
-            logger.info("Multimodal model and gallery loaded successfully.")
-        else:
-            logger.warning("Multimodal model file not found at %s. Multimodal search will be unavailable.", model_path)
-    except Exception as e:
-        logger.error("Failed to load multimodal model: %s", e, exc_info=True)
+    # ── FASE 2 (on-demand): Colorizer & Multimodal ──
+    # Tidak diload di sini. Masing-masing controller akan memanggil
+    # colorizer_engine.load() dan _load_multimodal_lazy() saat pertama request.
+    logger.info(
+        "[Startup] Colorizer dan Multimodal akan diload on-demand (lazy). "
+        "RAM saat idle: ~2-3 GB dari 16 GB."
+    )
 
     yield
 

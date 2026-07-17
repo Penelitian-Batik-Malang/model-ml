@@ -45,18 +45,22 @@ class ModelLoader:
                 return candidate
         return Path(primary_dir) / filename
 
-    def load_model(
+    def load_lightweight_models(
         self,
         model_path: str = "/app/models",
         data_path: str = "/app/data",
         checkpoints_path: str = "/app/checkpoints",
         tpu_path: str = "/app/tpu",
     ) -> bool:
-        """Load all models and supporting data."""
+        """Load hanya model-model ringan (motif, tulis, cbir).
+        
+        Colorizer (~8 GB) dan Multimodal (~4 GB) TIDAK diload di sini.
+        Gunakan load_colorizer_if_needed() untuk on-demand loading.
+        Strategi ini wajib untuk HF Spaces dengan 16 GB RAM.
+        """
         from app.config.settings import settings
 
         self.status = {"motif": False, "tulis": False, "cbir": False, "colorizer": False}
-
         self.model_path = model_path
         self.data_path = data_path
         self.checkpoints_path = checkpoints_path
@@ -66,50 +70,21 @@ class ModelLoader:
         data_dir = Path(data_path)
         checkpoints_dir = Path(checkpoints_path)
 
-        motif_model = self._resolve_file(
-            model_dir,
-            settings.MOTIF_MODEL_FILE,
-            [checkpoints_dir, data_dir],
-        )
-        motif_label = self._resolve_file(
-            model_dir,
-            settings.MOTIF_LABEL_FILE,
-            [checkpoints_dir, data_dir],
-        )
-
+        motif_model = self._resolve_file(model_dir, settings.MOTIF_MODEL_FILE, [checkpoints_dir, data_dir])
+        motif_label = self._resolve_file(model_dir, settings.MOTIF_LABEL_FILE, [checkpoints_dir, data_dir])
         self.motif_classifier = MotifClassifier(str(motif_model), str(motif_label))
         self.status["motif"] = self.motif_classifier.load()
 
-        tulis_model = self._resolve_file(
-            model_dir,
-            settings.TULIS_MODEL_FILE,
-            [checkpoints_dir, data_dir],
-        )
+        tulis_model = self._resolve_file(model_dir, settings.TULIS_MODEL_FILE, [checkpoints_dir, data_dir])
         self.tulis_classifier = TulisClassifier(str(tulis_model), device="cpu")
         self.status["tulis"] = self.tulis_classifier.load()
 
-        cbir_features = self._resolve_file(
-            data_dir,
-            settings.CBIR_FEATURES_FILE,
-            [model_dir, checkpoints_dir],
-        )
-        cbir_kmeans = self._resolve_file(
-            data_dir,
-            settings.CBIR_KMEANS_FILE,
-            [model_dir, checkpoints_dir],
-        )
-        cbir_index = self._resolve_file(
-            data_dir,
-            settings.CBIR_INDEX_FILE,
-            [model_dir, checkpoints_dir],
-        )
+        cbir_features = self._resolve_file(data_dir, settings.CBIR_FEATURES_FILE, [model_dir, checkpoints_dir])
+        cbir_kmeans = self._resolve_file(data_dir, settings.CBIR_KMEANS_FILE, [model_dir, checkpoints_dir])
+        cbir_index = self._resolve_file(data_dir, settings.CBIR_INDEX_FILE, [model_dir, checkpoints_dir])
         cbir_weights = None
         if settings.CBIR_FEATURE_EXTRACTOR_WEIGHTS:
-            cbir_weights = self._resolve_file(
-                model_dir,
-                settings.CBIR_FEATURE_EXTRACTOR_WEIGHTS,
-                [checkpoints_dir, data_dir],
-            )
+            cbir_weights = self._resolve_file(model_dir, settings.CBIR_FEATURE_EXTRACTOR_WEIGHTS, [checkpoints_dir, data_dir])
 
         self.cbir_engine = CBIREngine(
             features_path=str(cbir_features),
@@ -120,13 +95,43 @@ class ModelLoader:
         )
         self.status["cbir"] = self.cbir_engine.load()
 
+        logger.info(
+            "Lightweight models loaded — motif: %s, tulis: %s, cbir: %s",
+            self.status["motif"], self.status["tulis"], self.status["cbir"]
+        )
+        logger.info("Colorizer (lazy): belum dimuat, akan load on-demand saat pertama request.")
+        return any([self.status["motif"], self.status["tulis"], self.status["cbir"]])
+
+    def load_colorizer_if_needed(self) -> bool:
+        """Load colorizer on-demand (lazy). Aman dipanggil berkali-kali.
+        
+        Colorizer membutuhkan ~8 GB RAM (UNet FP32) atau ~2 GB (UNet INT8).
+        Hanya akan load sekali; request berikutnya langsung return True.
+        """
+        if self.status.get("colorizer", False):
+            return True
         try:
             self.status["colorizer"] = colorizer_engine.load()
+            if self.status["colorizer"]:
+                logger.info("Colorizer loaded on-demand successfully.")
+            else:
+                logger.error("Colorizer failed to load on-demand.")
         except Exception as e:
-            logger.error("Failed to load colorizer engine: %s", e)
+            logger.error("Exception loading colorizer on-demand: %s", e)
             self.status["colorizer"] = False
+        return self.status["colorizer"]
 
-        return any(self.status.values())
+    def load_model(
+        self,
+        model_path: str = "/app/models",
+        data_path: str = "/app/data",
+        checkpoints_path: str = "/app/checkpoints",
+        tpu_path: str = "/app/tpu",
+    ) -> bool:
+        """Load semua model termasuk colorizer (legacy, gunakan di lingkungan dengan RAM cukup)."""
+        loaded = self.load_lightweight_models(model_path, data_path, checkpoints_path, tpu_path)
+        self.load_colorizer_if_needed()
+        return loaded
 
     def is_model_loaded(self) -> bool:
         return all(self.status.values())

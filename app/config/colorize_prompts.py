@@ -4,7 +4,7 @@
 import os
 from pathlib import Path
 
-DEFAULT_STEPS = 20
+DEFAULT_STEPS = 8  # Dioptimasi untuk CPU 2-core HF Spaces (hemat 60% vs 20 steps)
 DEFAULT_CFG_SCALE = 12.0
 DEFAULT_COLOR_SCALE = 0.8
 DEFAULT_SEED = 42
