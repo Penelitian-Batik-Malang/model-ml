@@ -68,6 +68,15 @@ def add_blended_part(session_id: str, part: str, instance_index: int = 0) -> Non
     save_session_meta(session_id, meta)
 
 
+def remove_blended_part(session_id: str, part: str, instance_index: int = 0) -> None:
+    meta = load_session_meta(session_id)
+    blended = meta.get("parts_blended", [])
+    if part in blended:
+        blended.remove(part)
+    meta["parts_blended"] = blended
+    save_session_meta(session_id, meta)
+
+
 def reset_blended_parts(session_id: str) -> None:
     meta = load_session_meta(session_id)
     meta["parts_blended"] = []

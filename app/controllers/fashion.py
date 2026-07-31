@@ -42,6 +42,7 @@ from app.utils.session_handler import (
     get_session_dir,
     init_session,
     load_session_meta,
+    remove_blended_part,
     reset_blended_parts,
     session_exists,
 )
@@ -94,13 +95,17 @@ def _get_blending_mask(raw_result: Dict[str, Any], part: str, instance_index: in
     if decoded.ndim == 3 and decoded.shape[2] == 1:
         decoded = decoded[:, :, 0]
     base_mask = decoded.astype(bool)
-
+    base_mask_orig = base_mask.copy()
     if any(cid in UPPER_BODY_IDS for cid in target_class_ids):
         for p_enc in all_parts_masks:
             p_dec = mask_api.decode(p_enc)
             if p_dec.ndim == 3 and p_dec.shape[2] == 1:
                 p_dec = p_dec[:, :, 0]
             base_mask = np.logical_and(base_mask, np.logical_not(p_dec.astype(bool)))
+
+        # Fallback to base mask if sub-part subtraction leaves 0 pixels
+        if not base_mask.any():
+            base_mask = base_mask_orig
 
     return base_mask.astype(np.uint8)
 
@@ -446,6 +451,68 @@ async def reset_session(request: Request, session_id: str = Form(...)) -> Dict[s
         content=ResponseBuilder.success(
             data={"image_b64": _read_current_image_base64(session_dir)},
             message="Session reset",
+            status=200,
+        ).model_dump(),
+    )
+
+
+@router.post(
+    "/reset-part",
+    status_code=status.HTTP_200_OK,
+    summary="Reset specific part",
+)
+@limiter.limit(CLASSIFY_LIMIT)
+async def reset_part(
+    request: Request,
+    session_id: str = Form(...),
+    part: str = Form(...),
+    instance_index: int = Form(0),
+) -> Dict[str, Any]:
+    if not session_exists(session_id):
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content=ResponseBuilder.error(
+                message="Session not found",
+                status=404,
+                errors=["Session not found"],
+            ).model_dump(),
+        )
+
+    session_dir = get_session_dir(session_id)
+    current_path = session_dir / "current.jpg"
+    fashion_path = session_dir / "fashion.jpg"
+    result_npy = session_dir / "result.npy"
+
+    raw_result = load_segmentation_result(result_npy)
+    try:
+        selected_mask = _get_blending_mask(raw_result, part, instance_index)
+    except ValueError as exc:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content=ResponseBuilder.error(
+                message="Invalid request",
+                status=400,
+                errors=[str(exc)],
+            ).model_dump(),
+        )
+
+    current_rgb = load_image_rgb(current_path)
+    fashion_rgb = load_image_rgb(fashion_path)
+
+    if selected_mask.shape != current_rgb.shape[:2]:
+        selected_mask = resize_mask_to_image(selected_mask, current_rgb.shape[:2])
+
+    mask_bool = selected_mask > 0
+    current_rgb[mask_bool] = fashion_rgb[mask_bool]
+
+    save_image_from_rgb(current_rgb, current_path)
+    remove_blended_part(session_id, part, instance_index)
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content=ResponseBuilder.success(
+            data={"image_b64": encode_image_to_base64_jpeg(current_rgb)},
+            message=f"Part '{part}' reset successful",
             status=200,
         ).model_dump(),
     )
